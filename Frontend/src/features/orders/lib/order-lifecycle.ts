@@ -212,7 +212,8 @@ export function orderRefusal(error: unknown): OrderRefusal {
     case "no_approver":
       return {
         title: "Nobody can approve this order",
-        message: "No one holds a role the approval chain needs. Ask an administrator to fill it.",
+        message:
+          "No one holds a role the approval chain needs, such as the MD / CEO for a large industrial order. Ask an administrator to fill it.",
         stale: false,
       };
     case "rate_changed":

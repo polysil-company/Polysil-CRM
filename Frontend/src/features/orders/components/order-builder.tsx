@@ -60,8 +60,9 @@ import {
 } from "@/features/quotations/components/builder-parts";
 import { emptyLine, usePricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import {
-  draftFreightFrom,
-  freightToSave,
+  chargesPresent,
+  chargesToSave,
+  draftChargesFrom,
   linesToSave,
   readAnyFields,
   routeSaveErrors,
@@ -380,7 +381,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       source.mode === "edit" && source.order.lines.length > 0
         ? draftLinesFromOrder(source.order.lines)
         : [emptyLine()],
-    source.mode === "edit" ? draftFreightFrom(source.order.freight) : undefined,
+    source.mode === "edit" ? draftChargesFrom(source.order) : undefined,
   );
   const [formError, setFormError] = useState<{
     title: string;
@@ -403,8 +404,8 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         priced.plan.request !== null && priced.snapshot !== null
           ? linesToSave(priced.plan, priced.snapshot.preview)
           : [];
-      // QUOT-015 · Freight only where the order type takes it; elsewhere the backend clears it.
-      const freight = priced.gstChoice ? freightToSave(priced.plan) : undefined;
+      // QUOT-015, QUOT-016 · Charges only where the order type takes them; else the backend clears them.
+      const charges = priced.gstChoice ? chargesToSave(priced.plan) : undefined;
       const common = {
         delivery_address: orNull(values.deliveryAddress),
         payment_terms: values.paymentTerms,
@@ -426,7 +427,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
           place_of_supply_territory_id: values.place?.id ?? "",
           ...common,
           lines,
-          ...(freight === undefined || freight === null ? {} : { freight }),
+          ...(charges === undefined ? {} : chargesPresent(charges)),
           ...(showsStock && warehouseId !== null ? { warehouse_id: warehouseId } : {}),
         };
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
@@ -453,7 +454,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
       };
       const linesBody = {
         lines,
-        ...(freight === undefined ? {} : { freight }),
+        ...(charges ?? {}),
         expected_status: "draft" as const,
       };
       return saveDraft.mutateAsync({
@@ -487,7 +488,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
     setSubsidyServer(subsidised ? subsidyFieldErrors(error) : {});
     const routed = routeSaveErrors(fields, priced.plan.keys);
     priced.setLineErrors(routed.lines);
-    priced.setFreightSaveError(routed.freight);
+    priced.setChargeSaveErrors(routed.charges);
     for (const [field, message] of Object.entries(routed.header)) {
       const name = HEADER_FIELD_NAMES.find((candidate) => candidate === field);
       if (name !== undefined) form.setError(name, { type: "server", message });
@@ -579,7 +580,7 @@ export function OrderBuilder({ source }: { source: OrderBuilderSource }): React.
         if (
           Object.keys(routed.header).length > 0 ||
           Object.keys(routed.lines).length > 0 ||
-          routed.freight !== null
+          Object.values(routed.charges).some((message) => message !== null)
         ) {
           setFormError(null);
           return;

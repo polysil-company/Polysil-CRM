@@ -13,10 +13,16 @@ export const APPROVAL_DOC_TYPES = ["sales_order", "quotation", "complaint"] as c
 export type ApprovalDocType = (typeof APPROVAL_DOC_TYPES)[number];
 
 /**
- * The documents with approval limits: an order's value, a quotation's discount, and a
- * complaint's refund (FS-015b, rupees, the order's three managers, then Accounts).
+ * The documents with approval limits: an order's value, a quotation's discount, a complaint's
+ * refund (FS-015b, rupees, the order's three managers, then Accounts), and an industrial
+ * order's value on its own ladder (APPR-003, FS-089).
  */
-export const THRESHOLD_DOC_TYPES = ["sales_order", "quotation", "complaint"] as const;
+export const THRESHOLD_DOC_TYPES = [
+  "sales_order",
+  "quotation",
+  "complaint",
+  "industrial_order",
+] as const;
 export type ThresholdDocType = (typeof THRESHOLD_DOC_TYPES)[number];
 
 const isoDateTime = z.iso.datetime({ offset: true });
@@ -144,7 +150,15 @@ export const DISCOUNT_LIMIT_ROLES = [
   "regional_manager",
   "admin_sales",
 ] as const;
-export type LimitRole = (typeof DISCOUNT_LIMIT_ROLES)[number];
+/**
+ * APPR-003 · An industrial order's ladder (FS-089): the State Manager, the Regional Manager,
+ * then the MD / CEO, by value including GST. No District Manager step.
+ */
+export const INDUSTRIAL_LIMIT_ROLES = ["state_manager", "regional_manager", "md_ceo"] as const;
+
+/** Every role a limit row can be for. */
+export type LimitRole =
+  (typeof DISCOUNT_LIMIT_ROLES)[number] | (typeof INDUSTRIAL_LIMIT_ROLES)[number];
 
 const thresholdWireSchema = z.object({
   /** Any document the backend has limits for; rows of one the screen doesn't know are left out. */

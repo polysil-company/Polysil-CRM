@@ -26,17 +26,42 @@ export interface DraftLine {
   readonly gstSlab: string | null;
 }
 
-/** QUOT-015 · The freight box: an amount in rupees ("" for none) and a slab, if one was picked. */
+/**
+ * QUOT-015, QUOT-016 · A charge box: an amount in rupees ("" for none) and a slab, if one was
+ * picked. Freight (printed "Transportation"), installation and fittings all take this shape.
+ */
 export interface DraftFreight {
   readonly amount: string;
-  /** Null takes the default: the highest slab among the lines. */
+  /** Null takes the backend's default: 18% for installation, else the highest line slab. */
   readonly gstSlab: string | null;
 }
 
 export const NO_FREIGHT: DraftFreight = { amount: "", gstSlab: null };
 
-/** The backend's ceiling on a freight amount, in rupees. */
-const MAX_FREIGHT = 99_999_999.99;
+/**
+ * QUOT-015, QUOT-016 · The charges a commercial or industrial document can carry beside its
+ * lines, before tax (FS-069, FS-088). Each is optional and priced like a line.
+ */
+export const CHARGE_KINDS = ["freight", "installation", "fittings"] as const;
+export type ChargeKind = (typeof CHARGE_KINDS)[number];
+
+/** Every charge box on the builder. */
+export type DraftCharges = Readonly<Record<ChargeKind, DraftFreight>>;
+
+export const NO_CHARGES: DraftCharges = {
+  freight: NO_FREIGHT,
+  installation: NO_FREIGHT,
+  fittings: NO_FREIGHT,
+};
+
+/** What a save sends for each charge: what the preview priced, or null for none. */
+export type ChargeRequests = Readonly<Record<ChargeKind, FreightRequest | null>>;
+
+/** Something per charge, such as an error. */
+export type PerCharge<T> = Readonly<Record<ChargeKind, T>>;
+
+/** The backend's ceiling on a charge amount, in rupees. */
+const MAX_CHARGE = 99_999_999.99;
 
 const NUMBER_PATTERN = /^\d+(\.\d+)?$/;
 
@@ -76,26 +101,26 @@ export function lineIssue(line: DraftLine): string | null {
   return null;
 }
 
-/** QUOT-015 · Why the freight can't be priced, in words; null when it can or there is none. */
-export function freightIssue(freight: DraftFreight): string | null {
-  const text = freight.amount.trim();
+/** QUOT-015, QUOT-016 · Why a charge can't be priced, in words; null when it can or is empty. */
+export function chargeIssue(charge: DraftFreight): string | null {
+  const text = charge.amount.trim();
   if (text === "") {
     return null;
   }
-  if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0 || Number(text) > MAX_FREIGHT) {
+  if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0 || Number(text) > MAX_CHARGE) {
     return "Rupees above 0, with at most two decimals";
   }
   return null;
 }
 
-/** The freight a request carries, or null when the box is empty or not yet valid. */
-function freightRequestOf(freight: DraftFreight): FreightRequest | null {
-  if (freight.amount.trim() === "" || freightIssue(freight) !== null) {
+/** The charge a request carries, or null when the box is empty or not yet valid. */
+function chargeRequestOf(charge: DraftFreight): FreightRequest | null {
+  if (charge.amount.trim() === "" || chargeIssue(charge) !== null) {
     return null;
   }
   return {
-    amount: freight.amount.trim(),
-    ...(freight.gstSlab === null ? {} : { gst_slab: freight.gstSlab }),
+    amount: charge.amount.trim(),
+    ...(charge.gstSlab === null ? {} : { gst_slab: charge.gstSlab }),
   };
 }
 
@@ -146,14 +171,23 @@ export function allowsGstChoice(
 export function previewRequestFor(
   lines: readonly DraftLine[],
   context: PricingContext,
-  freight: DraftFreight = NO_FREIGHT,
+  charges: DraftCharges = NO_CHARGES,
 ): PreviewPlan {
   const priceable = lines.filter(isPriceable);
   if (priceable.length === 0) {
     return { request: null, keys: [] };
   }
   const choice = allowsGstChoice(context);
-  const freightRequest = choice ? freightRequestOf(freight) : null;
+  // QUOT-016 · Every charge goes only where the sale takes a GST choice.
+  const chargeFields: Partial<Record<ChargeKind, FreightRequest>> = {};
+  if (choice) {
+    for (const kind of CHARGE_KINDS) {
+      const request = chargeRequestOf(charges[kind]);
+      if (request !== null) {
+        chargeFields[kind] = request;
+      }
+    }
+  }
   return {
     request: {
       place_of_supply_territory_id: context.placeOfSupplyTerritoryId,
@@ -165,7 +199,7 @@ export function previewRequestFor(
         discount3_pct: discountValue(line.discounts[2]) ?? "0",
         ...(choice && line.gstSlab !== null ? { gst_slab: line.gstSlab } : {}),
       })),
-      ...(freightRequest === null ? {} : { freight: freightRequest }),
+      ...chargeFields,
       ...(context.asOf === null ? {} : { as_of: context.asOf }),
       ...(context.partnerId === null ? {} : { partner_id: context.partnerId }),
       ...(context.salesType === null ? {} : { sales_type: context.salesType }),
@@ -211,12 +245,30 @@ export function linesToSave(plan: PreviewPlan, preview: QuotePreview): Quotation
   });
 }
 
-/** QUOT-015 · The freight a save sends: what the preview priced, or null for none. */
-export function freightToSave(plan: PreviewPlan): FreightRequest | null {
-  return plan.request?.freight ?? null;
+/** QUOT-015, QUOT-016 · The charges a save sends: what the preview priced, null for none. */
+export function chargesToSave(plan: PreviewPlan): ChargeRequests {
+  return {
+    freight: plan.request?.freight ?? null,
+    installation: plan.request?.installation ?? null,
+    fittings: plan.request?.fittings ?? null,
+  };
 }
 
-/** QUOT-015 · The freight box for a saved draft. */
+/** QUOT-016 · The charges a new document carries: only those with an amount. */
+export function chargesPresent(
+  charges: ChargeRequests,
+): Partial<Record<ChargeKind, FreightRequest>> {
+  const present: Partial<Record<ChargeKind, FreightRequest>> = {};
+  for (const kind of CHARGE_KINDS) {
+    const charge = charges[kind];
+    if (charge !== null) {
+      present[kind] = charge;
+    }
+  }
+  return present;
+}
+
+/** QUOT-015 · One charge box for a saved draft. */
 export function draftFreightFrom(freight: Freight | null): DraftFreight {
   return freight === null
     ? NO_FREIGHT
@@ -224,6 +276,19 @@ export function draftFreightFrom(freight: Freight | null): DraftFreight {
         amount: trimZeros(freight.amount),
         gstSlab: freight.gstSlabChosen ? trimZeros(freight.gstSlab) : null,
       };
+}
+
+/** QUOT-016 · Every charge box for a saved quotation or order. */
+export function draftChargesFrom(saved: {
+  readonly freight: Freight | null;
+  readonly installation: Freight | null;
+  readonly fittings: Freight | null;
+}): DraftCharges {
+  return {
+    freight: draftFreightFrom(saved.freight),
+    installation: draftFreightFrom(saved.installation),
+    fittings: draftFreightFrom(saved.fittings),
+  };
 }
 
 /** QUOT-015 · Two slabs are the same rate: "18", "18.0" and "18.000" alike. */
@@ -301,8 +366,8 @@ export interface SaveErrors {
   readonly header: Readonly<Record<string, string>>;
   /** Row errors by row key. */
   readonly lines: Readonly<Record<string, string>>;
-  /** QUOT-015 · A refusal of the freight, its amount or its slab; null when none. */
-  readonly freight: string | null;
+  /** QUOT-015, QUOT-016 · A refusal of each charge, its amount or its slab; null when none. */
+  readonly charges: PerCharge<string | null>;
 }
 
 const HEADER_FIELDS: Readonly<Record<string, string>> = {
@@ -339,7 +404,11 @@ export function routeSaveErrors(
 ): SaveErrors {
   const header: Record<string, string> = {};
   const lines: Record<string, string> = {};
-  let freight: string | null = null;
+  const charges: Record<ChargeKind, string | null> = {
+    freight: null,
+    installation: null,
+    fittings: null,
+  };
   for (const [path, reason] of Object.entries(fields)) {
     const text = sentence(reason);
     const headerField = HEADER_FIELDS[path];
@@ -347,8 +416,9 @@ export function routeSaveErrors(
       header[headerField] = text;
       continue;
     }
-    if (path === "freight" || path.startsWith("freight.")) {
-      freight ??= path === "freight.gst_slab" ? `GST: ${lowerFirst(text)}` : text;
+    const kind = CHARGE_KINDS.find((each) => path === each || path.startsWith(`${each}.`));
+    if (kind !== undefined) {
+      charges[kind] ??= path === `${kind}.gst_slab` ? `GST: ${lowerFirst(text)}` : text;
       continue;
     }
     const match = LINE_FIELD_PATTERN.exec(path);
@@ -368,7 +438,7 @@ export function routeSaveErrors(
       lines[key] ??= label === "" ? text : `${label}: ${lowerFirst(text)}`;
     }
   }
-  return { header, lines, freight };
+  return { header, lines, charges };
 }
 
 function lowerFirst(text: string): string {

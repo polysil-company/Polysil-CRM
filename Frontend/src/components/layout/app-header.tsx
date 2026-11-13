@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { useSession } from "@/features/session/hooks/use-session";
+import { APP_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 import { useCommandMenu } from "./command-menu-context";
@@ -29,7 +30,7 @@ export function AppHeader({ className }: { className?: string }): React.JSX.Elem
   // A page the user may not open is not named either: the route guard says so (APP-006, F-17).
   const denied =
     session !== undefined && !canOpenPath(pathname, session.permissions, session.userType);
-  const heading: PageHeading = denied ? { title: "Polysil CRM" } : findPageHeading(pathname);
+  const heading: PageHeading = denied ? { title: APP_NAME } : findPageHeading(pathname);
 
   return (
     <header

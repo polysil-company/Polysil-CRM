@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   DISCOUNT_LIMIT_ROLES,
+  INDUSTRIAL_LIMIT_ROLES,
   ORDER_LIMIT_ROLES,
   THRESHOLD_DOC_TYPES,
   type QueuePageWire,
@@ -76,7 +77,7 @@ function toRow(step: MockApprovalStep): QueuePageWire["data"][number] {
 
 const thresholdPutSchema = z.object({
   doc_type: z.enum(THRESHOLD_DOC_TYPES).default("sales_order"),
-  role: z.enum(DISCOUNT_LIMIT_ROLES),
+  role: z.enum([...DISCOUNT_LIMIT_ROLES, ...INDUSTRIAL_LIMIT_ROLES]),
   territory_id: z.string().min(1).nullish(),
   max_amount: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)]).nullish(),
 });
@@ -87,6 +88,8 @@ const LIMIT_LEVELS: Readonly<Record<ThresholdDocType, readonly string[]>> = {
   quotation: DISCOUNT_LIMIT_ROLES,
   // A refund climbs the order's three managers (FS-015b).
   complaint: ORDER_LIMIT_ROLES,
+  // APPR-003 · An industrial order's own ladder (FS-089).
+  industrial_order: INDUSTRIAL_LIMIT_ROLES,
 };
 
 const decisionSchema = z.object({
@@ -163,6 +166,11 @@ export const approvalHandlers = [
     if (docType === "quotation" && amount === null && role !== "admin_sales") {
       return errorResponse(422, "validation_error", "Some fields need correcting.", {
         max_amount: "only Admin-Sales may have no limit",
+      });
+    }
+    if (docType === "industrial_order" && amount === null && role !== "md_ceo") {
+      return errorResponse(422, "validation_error", "Some fields need correcting.", {
+        max_amount: "only the MD may have no limit",
       });
     }
     const group = mockDb.thresholds.filter(

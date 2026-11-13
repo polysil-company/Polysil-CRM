@@ -74,6 +74,10 @@ const totalsSchema = z.object({
   discount: decimal,
   /** QUOT-015 · Freight before tax, "0.00" without; inside taxable and total, not gross. */
   freight: decimal.default("0.00"),
+  /** QUOT-016 · Installation charges before tax, "0.00" without (FS-088). */
+  installation: decimal.default("0.00"),
+  /** QUOT-016 · Fittings material charges before tax, "0.00" without (FS-088). */
+  fittings: decimal.default("0.00"),
   taxable: decimal,
   cgst: decimal,
   sgst: decimal,
@@ -502,6 +506,10 @@ export const orderWireSchema = z.object({
   lines: z.array(orderLineSchema),
   /** QUOT-015 · The freight, or null. */
   freight: freightWireSchema.nullish(),
+  /** QUOT-016 · Installation charges, or null (FS-088). */
+  installation: freightWireSchema.nullish(),
+  /** QUOT-016 · Fittings material charges, or null (FS-088). */
+  fittings: freightWireSchema.nullish(),
   /** QUOT-015 · Lines whose GST slab was picked: shown to an approver. */
   gst_changed_lines: z.number().int().nonnegative().default(0),
   totals: totalsSchema,
@@ -586,6 +594,8 @@ export const orderSchema = orderWireSchema.transform((wire) => ({
   isProvisional: wire.is_provisional,
   lines: wire.lines,
   freight: wire.freight ?? null,
+  installation: wire.installation ?? null,
+  fittings: wire.fittings ?? null,
   gstChangedLines: wire.gst_changed_lines,
   totals: wire.totals,
   approval: wire.approval,
@@ -687,6 +697,9 @@ export interface CreateDirectOrder {
   readonly lines: readonly QuotationLineRequest[];
   /** QUOT-015 · One freight charge before tax; commercial and industrial only. */
   readonly freight?: FreightRequest;
+  /** QUOT-016 · Installation and fittings charges, like freight (FS-088). */
+  readonly installation?: FreightRequest;
+  readonly fittings?: FreightRequest;
   /** DISP-003 · "Order to"; null or left out means the default. Staff only (a dealer gets 422). */
   readonly warehouse_id?: string | null;
 }
@@ -696,6 +709,9 @@ export interface ReplaceOrderLinesRequest {
   readonly lines: readonly QuotationLineRequest[];
   /** QUOT-015 · Omit to keep; null to remove. */
   readonly freight?: FreightRequest | null;
+  /** QUOT-016 · Omit to keep; null to remove (FS-088). */
+  readonly installation?: FreightRequest | null;
+  readonly fittings?: FreightRequest | null;
   readonly expected_status: "draft";
 }
 

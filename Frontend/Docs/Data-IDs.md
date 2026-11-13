@@ -135,6 +135,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | APP-010 | Polysil's logo everywhere: sign-in, sidebar, portal, public pages, browser tab, Android icon and splash | frontend | in-progress |
 | APP-011 | Downloads as Excel, CSV or PDF — every list's file in CSV too, and a report as PDF (`format` on every export and report) | shared | in-progress |
 | APP-012 | Downloads on 24 more lists — masters, stock, payments, schemes, rewards and the rest (`GET <list>/export`, FS-081) | shared | in-progress |
+| APP-013 | The software's name, Polysil Sarthi · Your Digital Business Partner, and the client's vision on sign-in | frontend | in-progress |
 | OBS-001 | Logger utility with runtime log level | frontend | in-progress |
 | OBS-002 | API client — request IDs, error normalisation, response contract validation | shared | in-progress |
 | DS-001 | Design tokens and component library | frontend | in-progress |
@@ -205,6 +206,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-013 | Export the quotation list to Excel (`GET /quotations/export`) | shared | in-progress |
 | QUOT-014 | A subsidised quotation's subsidy, for one farmer category (`PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation`) | shared | in-progress |
 | QUOT-015 | A GST slab per line, and freight, on a commercial or industrial quotation or order (`GET /pricing/gst-slabs`; `gst_slab` and `freight` on the preview, the saves and the lines) | shared | in-progress |
+| QUOT-016 | Installation and fittings material charges, each with its GST, on a commercial or industrial quotation or order (`installation` and `fittings` beside `freight`, FS-088) | shared | in-progress |
 | SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |
@@ -220,6 +222,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SO-013 | An order from a lead goes through the dealer or distributor staff pick, starting at the lead's channel partner (`POST /orders` with `lead_id` and `partner_id`) | shared | in-progress |
 | APPR-001 | Approval inbox — amount-based escalation (`GET /approvals/pending`, `POST /approvals/steps/{stepId}/decision`) | shared | in-progress |
 | APPR-002 | Approval limits — order value and discount per role (`GET /approvals/thresholds`, `PUT /approvals/thresholds`) | shared | in-progress |
+| APPR-003 | Industrial orders' own approval ladder: State Manager, Regional Manager, then the MD / CEO (`doc_type: industrial_order`, FS-089) | shared | in-progress |
 | CMPL-001 | Complaints list — filters, waiting on me, counts (`GET /complaints`, `GET /complaints/stats`) | shared | in-progress |
 | CMPL-002 | Complaint detail and history (`GET /complaints/{id}`, `GET /complaints/{id}/timeline`) | shared | in-progress |
 | CMPL-003 | Raise a complaint — draft, edit, products, submit, cancel, delete (`POST /complaints`, `PATCH /complaints/{id}`, `PUT /complaints/{id}/lines`, `POST /complaints/{id}/submit`, `POST /complaints/{id}/cancel`, `DELETE /complaints/{id}`) | shared | in-progress |

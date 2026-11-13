@@ -1,5 +1,6 @@
 import {
   DISCOUNT_LIMIT_ROLES,
+  INDUSTRIAL_LIMIT_ROLES,
   ORDER_LIMIT_ROLES,
   type ThresholdDocType,
   type LimitRole,
@@ -16,9 +17,20 @@ import { formatInr } from "@/lib/format";
  * (backend/docs/api/approvals.md, `put_threshold`); these only explain them before saving.
  */
 
-/** The roles of a document's ladder, lowest first: a refund climbs the order's managers. */
+/**
+ * The roles of a document's ladder, lowest first: a refund climbs the order's managers, and an
+ * industrial order its own, up to the MD / CEO (APPR-003).
+ */
 export function ladderRoles(docType: ThresholdDocType): readonly LimitRole[] {
-  return docType === "quotation" ? DISCOUNT_LIMIT_ROLES : ORDER_LIMIT_ROLES;
+  switch (docType) {
+    case "quotation":
+      return DISCOUNT_LIMIT_ROLES;
+    case "industrial_order":
+      return INDUSTRIAL_LIMIT_ROLES;
+    case "sales_order":
+    case "complaint":
+      return ORDER_LIMIT_ROLES;
+  }
 }
 
 /** Rupees for an order's value and a refund; percent for a quotation's discount. */
