@@ -66,12 +66,17 @@ import {
 import { MOCK_CREATOR, newMockEvent } from "./lead-events";
 import { paymentsBlockFor } from "./payments";
 import {
+  extraChargesInSchema,
+  extraChargesRefusal,
+  extrasAfterSave,
   freightInSchema,
   gstChoiceRefusal,
   lineInSchema,
   priceLines,
+  pricedExtras,
   pricedFreight,
   rateChanges,
+  storedExtrasIn,
   storedFreightIn,
 } from "./quotations";
 import { applyOrderPoints, releaseOrderPoints } from "./rewards";
@@ -463,6 +468,8 @@ const createSchema = z.object({
   lines: z.array(lineInSchema).max(200).default([]),
   /** QUOT-015 · One freight charge; commercial and industrial only. */
   freight: freightInSchema.nullish(),
+  /** QUOT-016 · Installation and fittings, like freight. */
+  ...extraChargesInSchema,
   /** SO-008 · Typed in on a direct subsidised order; refused alongside quotations. */
   subsidy: subsidySchema.optional(),
   /** DISP-003 · "Order to"; staff only. */
@@ -475,6 +482,8 @@ const linesSchema = z.object({
   lines: z.array(lineInSchema).max(200),
   /** QUOT-015 · omit to keep, null to remove */
   freight: freightInSchema.nullish(),
+  /** QUOT-016 · the same for installation and fittings */
+  ...extraChargesInSchema,
   expected_status: expectedStatus,
 });
 
@@ -725,6 +734,13 @@ function createDirect(
     body.freight,
   );
   if (choiceRefusal !== null) return choiceRefusal;
+  const extrasRefusal = extraChargesRefusal(
+    body.order_type,
+    treatment === "domestic",
+    body.lines,
+    body,
+  );
+  if (extrasRefusal !== null) return extrasRefusal;
   const pricing = sample ? samplePricing() : null;
   const priced = { lines: domestic.lines.map((line) => repriced(line, treatment, pricing)) };
   const me = mockMeFor(readMockRole()).data;
@@ -745,6 +761,7 @@ function createDirect(
       me.org_unit ?? { id: "ou-head-office", name: "Head Office" },
     lines: priced.lines,
     freight: pricedFreight(body.freight, priced.lines),
+    ...pricedExtras(body, priced.lines),
     orderType: body.order_type,
     deliveryAddress: body.delivery_address ?? null,
     paymentTerms: body.payment_terms,
@@ -1300,18 +1317,28 @@ export const orderHandlers = [
       parsed.data.freight,
     );
     if (choiceRefusal !== null) return choiceRefusal;
+    const extrasRefusal = extraChargesRefusal(
+      order.order_type,
+      (order.tax_treatment ?? "domestic") === "domestic",
+      parsed.data.lines,
+      parsed.data,
+    );
+    if (extrasRefusal !== null) return extrasRefusal;
     const priced = {
       lines: domestic.lines.map((line) =>
         repriced(line, order.tax_treatment ?? "domestic", order.sample_pricing ?? null),
       ),
     };
-    const kept = takesGstChoice(order.order_type) ? storedFreightIn(order.freight ?? null) : null;
+    const takesCharges = takesGstChoice(order.order_type);
+    const kept = takesCharges ? storedFreightIn(order.freight ?? null) : null;
     const freightIn = parsed.data.freight === undefined ? kept : parsed.data.freight;
+    const extrasIn = extrasAfterSave(parsed.data, takesCharges ? storedExtrasIn(order) : {});
     Object.assign(
       order,
       withOrderLines(
         orderLinesFrom(priced.lines),
         priced.lines.length === 0 ? null : pricedFreight(freightIn, priced.lines),
+        pricedExtras(extrasIn, priced.lines),
       ),
     );
     applySubsidy(order);
@@ -1471,6 +1498,7 @@ export const orderHandlers = [
           freeSample ? order.totals.gross : order.totals.total,
           mockDb.thresholds,
           order.territory.id,
+          order.order_type,
         ),
         200_000 + mockDb.approvalSteps.length * 10,
       ),

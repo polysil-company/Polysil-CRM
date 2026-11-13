@@ -163,6 +163,15 @@ export const DATA_IDS = {
     notes:
       "FS-081. The same Download Excel button and filters as the list; more than 5,000 rows is 422 export_too_large.",
   },
+  "APP-013": {
+    domain: "APP",
+    title:
+      "The software's name, Polysil Sarthi · Your Digital Business Partner, and the client's vision on sign-in",
+    owner: "frontend",
+    status: "in-progress",
+    notes:
+      "Client ask, 13 Nov 2026. src/lib/brand.ts holds the words; the Android launcher reads Polysil Sarthi too.",
+  },
   "OBS-001": {
     domain: "OBS",
     title: "Logger utility with runtime log level",
@@ -552,6 +561,16 @@ export const DATA_IDS = {
     notes:
       "FS-069. Commercial and industrial only. Each line presets to its hsn_slab; gst_slab is sent only when picked. Freight without a slab takes the highest line slab; taxable and total include it, gross and discount don't.",
   },
+  "QUOT-016": {
+    domain: "QUOT",
+    title:
+      "Installation and fittings material charges, each with its GST, on a commercial or industrial quotation or order",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: ["POST /pricing/quote-lines", "POST /quotations", "POST /orders"],
+    notes:
+      "FS-088. Like freight (QUOT-015), printed as Transportation: installation defaults to 18%, fittings to the highest line slab. Codes charge_not_allowed, charge_without_lines, charge_amount_invalid.",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",
@@ -684,6 +703,20 @@ export const DATA_IDS = {
     endpoints: ["GET /approvals/thresholds", "PUT /approvals/thresholds"],
     notes:
       "Anyone signed in reads them; masters.edit changes them. Each level stays above the one below.",
+  },
+  "APPR-003": {
+    domain: "APPR",
+    title:
+      "Industrial orders' own approval ladder: State Manager, Regional Manager, then the MD / CEO",
+    owner: "shared",
+    status: "in-progress",
+    endpoints: [
+      "GET /approvals/thresholds",
+      "PUT /approvals/thresholds",
+      "POST /orders/{orderId}/submit",
+    ],
+    notes:
+      "FS-089. doc_type industrial_order; only the MD may have no limit; 422 no_approver when nobody can take the MD step.",
   },
   "CMPL-001": {
     domain: "CMPL",

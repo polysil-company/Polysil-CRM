@@ -116,8 +116,17 @@ export const ANSWER_LABELS: Readonly<Record<QuotationAnswer, string>> = {
 /** "State Manager" for a role code; an unknown code is humanised. */
 export function roleLabel(code: string): string {
   const role = ROLES.find((candidate) => candidate === code);
-  return role === undefined ? humanizeCode(code) : ROLE_LABELS[role];
+  if (role !== undefined) return ROLE_LABELS[role];
+  // The backend's own codes for roles the screens don't sign in as (APPR-003: an MD's step).
+  return BACKEND_ROLE_LABELS[code] ?? humanizeCode(code);
 }
+
+/** Backend role codes whose words differ from a plain reading of the code. */
+const BACKEND_ROLE_LABELS: Readonly<Record<string, string>> = {
+  md_ceo: "MD / CEO",
+  admin_sales: "Admin-Sales",
+  field_officer: "Field Officer",
+};
 
 const refusalSchema = z.object({
   fields: z.record(z.string(), z.string()).optional(),

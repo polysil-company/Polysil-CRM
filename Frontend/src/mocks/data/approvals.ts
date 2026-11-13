@@ -72,6 +72,10 @@ export function seedThresholds(overrideTerritory: ThresholdWire["territory"]): T
     { ...order("district_manager", "25000.00"), doc_type: "complaint" },
     { ...order("state_manager", "100000.00"), doc_type: "complaint" },
     { ...order("regional_manager", null), doc_type: "complaint" },
+    // APPR-003 · migration 090's stand-ins (FS-089, GAP-593): the industrial ladder.
+    { ...order("state_manager", "500000.00"), doc_type: "industrial_order" },
+    { ...order("regional_manager", "2500000.00"), doc_type: "industrial_order" },
+    { ...order("md_ceo", null), doc_type: "industrial_order" },
   ];
 }
 
@@ -97,17 +101,30 @@ export function limitOf(
 
 const ORDER_MANAGERS = ["district_manager", "state_manager", "regional_manager"] as const;
 
-/** An order's managers: each level up to the first whose limit covers its total. */
+/** APPR-003 · An industrial order's own ladder (FS-089): no District Manager step. */
+const INDUSTRIAL_MANAGERS = ["state_manager", "regional_manager", "md_ceo"] as const;
+
+/**
+ * An order's managers: each level up to the first whose limit covers its total. An industrial
+ * order climbs its own ladder, up to the MD / CEO (APPR-003).
+ */
 export function orderManagersFor(
   total: string,
   thresholds: readonly ThresholdWire[],
   territoryId: string | null,
+  orderType: string | null = null,
 ): string[] {
   const amount = Number(total);
   const managers: string[] = [];
-  for (const role of ORDER_MANAGERS) {
+  const industrial = orderType === "industrial";
+  for (const role of industrial ? INDUSTRIAL_MANAGERS : ORDER_MANAGERS) {
     managers.push(role);
-    const limit = limitOf(thresholds, "sales_order", role, territoryId);
+    const limit = limitOf(
+      thresholds,
+      industrial ? "industrial_order" : "sales_order",
+      role,
+      territoryId,
+    );
     if (limit === null || (limit !== undefined && amount <= limit)) {
       break;
     }

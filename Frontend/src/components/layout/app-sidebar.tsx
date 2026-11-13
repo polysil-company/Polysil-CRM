@@ -20,6 +20,7 @@ import { orderStatsQueryOptions } from "@/features/orders/api/orders.queries";
 import { ACCOUNTS_ROLE } from "@/features/orders/api/orders.schemas";
 import { useCan, useCanApprove, useSession } from "@/features/session/hooks/use-session";
 import { useModifierKeyLabel } from "@/hooks/use-modifier-key";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { clientEnv, type ApiMockingMode, type AppEnv } from "@/lib/env/client";
 import { formatCount, formatNumber } from "@/lib/format";
 import { useSidebar } from "@/lib/sidebar/use-sidebar";
@@ -100,8 +101,11 @@ function SidebarBrand(): React.JSX.Element {
     <div className="flex h-8 items-center gap-2 px-0.5">
       <BrandMark className="size-7 shrink-0" />
       <div className={cn(LABEL_FADE_CLASSES, "flex flex-col")}>
-        <span className="truncate text-sm font-semibold text-foreground">Polysil</span>
-        <span className="truncate text-xs text-muted-foreground">CRM & DMS</span>
+        {/* APP-013 · The software's name and tagline. */}
+        <span className="truncate text-sm font-semibold text-foreground">{APP_NAME}</span>
+        <span className="truncate text-xs text-muted-foreground" title={APP_TAGLINE}>
+          {APP_TAGLINE}
+        </span>
       </div>
       {clientEnv.appEnv === "production" ? null : (
         <Badge size="sm" variant="highlight" className="ml-auto sidebar-collapsed:hidden">

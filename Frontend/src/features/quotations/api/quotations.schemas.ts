@@ -78,6 +78,10 @@ const totalsSchema = z.object({
   discount: decimal,
   /** QUOT-015 · Freight before tax, "0.00" without; inside taxable and total, not gross. */
   freight: decimal.default("0.00"),
+  /** QUOT-016 · Installation charges before tax, "0.00" without (FS-088). */
+  installation: decimal.default("0.00"),
+  /** QUOT-016 · Fittings material charges before tax, "0.00" without (FS-088). */
+  fittings: decimal.default("0.00"),
   taxable: decimal,
   cgst: decimal,
   sgst: decimal,
@@ -439,6 +443,10 @@ export const quotationWireSchema = z.object({
   lines: z.array(quotationLineSchema),
   /** QUOT-015 · The freight, or null. */
   freight: freightWireSchema.nullish(),
+  /** QUOT-016 · Installation charges, or null (FS-088). */
+  installation: freightWireSchema.nullish(),
+  /** QUOT-016 · Fittings material charges, or null (FS-088). */
+  fittings: freightWireSchema.nullish(),
   /** QUOT-015 · Lines whose GST slab was picked. */
   gst_changed_lines: z.number().int().nonnegative().default(0),
   totals: totalsSchema,
@@ -513,6 +521,8 @@ export const quotationSchema = quotationWireSchema.transform((wire) => ({
   priceList: wire.price_list,
   lines: wire.lines,
   freight: wire.freight ?? null,
+  installation: wire.installation ?? null,
+  fittings: wire.fittings ?? null,
   gstChangedLines: wire.gst_changed_lines,
   totals: wire.totals,
   isProvisional: wire.is_provisional,
@@ -662,6 +672,10 @@ export interface QuoteLinesRequest {
   readonly tax_treatment?: TaxTreatment;
   /** QUOT-015 · One freight charge; commercial and industrial only, with at least one line. */
   readonly freight?: FreightRequest;
+  /** QUOT-016 · Installation charges, like freight (FS-088). */
+  readonly installation?: FreightRequest;
+  /** QUOT-016 · Fittings material charges, like freight (FS-088). */
+  readonly fittings?: FreightRequest;
 }
 
 const previewLineWireSchema = quotationLineWireSchema.omit({ line_no: true });
@@ -675,6 +689,8 @@ export const quotePreviewResponseSchema = z
       price_list_ids: z.array(z.string()),
       lines: z.array(previewLineWireSchema),
       freight: freightWireSchema.nullish(),
+      installation: freightWireSchema.nullish(),
+      fittings: freightWireSchema.nullish(),
       totals: totalsSchema,
       warnings: z.array(z.string()),
     }),
@@ -684,6 +700,8 @@ export const quotePreviewResponseSchema = z
     intraState: data.intra_state,
     lines: data.lines.map((line, index) => toLine(line, index + 1)),
     freight: data.freight ?? null,
+    installation: data.installation ?? null,
+    fittings: data.fittings ?? null,
     totals: data.totals,
     warnings: data.warnings,
   }));
@@ -723,6 +741,9 @@ export interface CreateQuotationRequest {
   readonly lines: readonly QuotationLineRequest[];
   /** QUOT-015 · Commercial and industrial only, with at least one line. */
   readonly freight?: FreightRequest;
+  /** QUOT-016 · Installation and fittings charges, like freight (FS-088). */
+  readonly installation?: FreightRequest;
+  readonly fittings?: FreightRequest;
 }
 
 /** PATCH /quotations/{id} — a draft's header; the response re-prices the lines. */
@@ -740,6 +761,9 @@ export interface ReplaceLinesRequest {
   readonly lines: readonly QuotationLineRequest[];
   /** QUOT-015 · Omit to keep; null to remove. */
   readonly freight?: FreightRequest | null;
+  /** QUOT-016 · Omit to keep; null to remove (FS-088). */
+  readonly installation?: FreightRequest | null;
+  readonly fittings?: FreightRequest | null;
   readonly expected_status: "draft";
 }
 

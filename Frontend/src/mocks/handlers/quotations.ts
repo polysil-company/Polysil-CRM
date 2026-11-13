@@ -36,6 +36,7 @@ import {
   priceListItemId,
   toQuotationSummary,
   totalsOf,
+  type MockExtraCharges,
   withLines,
 } from "@/mocks/data/quotations";
 import { MOCK_ID_SPACE, mockUuid } from "@/mocks/data/reference";
@@ -174,14 +175,17 @@ export function storedFreightIn(freight: FreightWire | null): FreightIn | null {
  */
 function clearedGstChoice(quotation: QuotationWire): QuotationWire | null {
   const choices = quotation.lines.filter((line) => line.gst_slab_chosen === true).length;
-  const freight = quotation.freight !== null && quotation.freight !== undefined;
+  const freight =
+    (quotation.freight !== null && quotation.freight !== undefined) ||
+    (quotation.installation !== null && quotation.installation !== undefined) ||
+    (quotation.fittings !== null && quotation.fittings !== undefined);
   if (GST_CHOICE_SALES_TYPES.some((type) => type === quotation.sales_type)) return null;
   if (choices === 0 && !freight) return null;
   const repriced = priceLines(quotation.lines.map((line) => storedLineIn(line, false)));
   if (!repriced.ok) return null;
   const what = [
     ...(choices > 0 ? [`the GST choice on ${String(choices)} lines`] : []),
-    ...(freight ? ["the freight"] : []),
+    ...(freight ? ["the charges"] : []),
   ];
   return withLines(
     quotation,
@@ -190,6 +194,7 @@ function clearedGstChoice(quotation: QuotationWire): QuotationWire | null {
       `gst_choice_cleared: ${what.join(" and ")} removed; this document type takes the HSN rate and no freight.`,
     ],
     null,
+    { installation: null, fittings: null },
   );
 }
 
@@ -280,6 +285,113 @@ export function pricedFreight(
   if (freight === null || freight === undefined) return null;
   const slab = freight.gst_slab ?? Math.max(...lines.map((line) => Number(line.gst_slab)));
   return mockFreight(Math.round(Number(freight.amount) * 100), slab, freight.gst_slab !== null);
+}
+
+/** QUOT-016 · Installation and fittings in a request (FS-088): omit, null, or a charge. */
+export const extraChargesInSchema = {
+  installation: freightInSchema.nullish(),
+  fittings: freightInSchema.nullish(),
+};
+
+export interface ExtraChargesIn {
+  readonly installation?: FreightIn | null | undefined;
+  readonly fittings?: FreightIn | null | undefined;
+}
+
+const EXTRA_KINDS = ["installation", "fittings"] as const;
+
+/**
+ * QUOT-016 · Installation and fittings refused as the backend refuses them (FS-088): like
+ * freight, with its own codes naming the charge.
+ */
+export function extraChargesRefusal(
+  salesType: string | null,
+  domestic: boolean,
+  lines: readonly LineIn[],
+  extras: ExtraChargesIn,
+): Response | null {
+  const allows = domestic && GST_CHOICE_SALES_TYPES.some((type) => type === salesType);
+  const offered = offeredSlabs();
+  for (const kind of EXTRA_KINDS) {
+    const charge = extras[kind];
+    if (charge === null || charge === undefined) continue;
+    if (!allows) {
+      return errorResponse(
+        422,
+        "charge_not_allowed",
+        `${kind} is for commercial and industrial documents only.`,
+        { [kind]: "Not allowed." },
+      );
+    }
+    if (lines.length === 0) {
+      return errorResponse(422, "charge_without_lines", `${kind} needs at least one goods line.`, {
+        [kind]: "Add a line first.",
+      });
+    }
+    if (charge.gst_slab !== null && !offered.includes(charge.gst_slab)) {
+      return errorResponse(
+        422,
+        "gst_slab_not_offered",
+        "A GST slab may be chosen from the slabs in force only.",
+        {
+          [`${kind}.gst_slab`]: `${String(charge.gst_slab)} % is not one of the GST slabs offered.`,
+        },
+      );
+    }
+    const text = String(charge.amount);
+    if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0 || Number(text) > 99_999_999.99) {
+      return errorResponse(
+        422,
+        "charge_amount_invalid",
+        `${kind} must be above zero, at most 99999999.99, in rupees and paise.`,
+        { [`${kind}.amount`]: "Rupees above 0, with at most two decimals." },
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * QUOT-016 · Installation and fittings priced: installation defaults to 18 % (a service),
+ * fittings to the highest among the priced lines, like freight.
+ */
+export function pricedExtras(
+  extras: ExtraChargesIn,
+  lines: readonly QuotationLineWire[],
+): MockExtraCharges {
+  if (lines.length === 0) return { installation: null, fittings: null };
+  const highest = Math.max(...lines.map((line) => Number(line.gst_slab)));
+  const price = (charge: FreightIn | null | undefined, fallback: number): FreightWire | null =>
+    charge === null || charge === undefined
+      ? null
+      : mockFreight(
+          Math.round(Number(charge.amount) * 100),
+          charge.gst_slab ?? fallback,
+          charge.gst_slab !== null,
+        );
+  return {
+    installation: price(extras.installation, 18),
+    fittings: price(extras.fittings, highest),
+  };
+}
+
+/** QUOT-016 · A document's stored installation and fittings, as the requests that made them. */
+export function storedExtrasIn(document: {
+  readonly installation?: FreightWire | null | undefined;
+  readonly fittings?: FreightWire | null | undefined;
+}): ExtraChargesIn {
+  return {
+    installation: storedFreightIn(document.installation ?? null),
+    fittings: storedFreightIn(document.fittings ?? null),
+  };
+}
+
+/** QUOT-016 · A save's installation and fittings: omitted keeps what was stored, null removes. */
+export function extrasAfterSave(sent: ExtraChargesIn, kept: ExtraChargesIn): ExtraChargesIn {
+  return {
+    installation: sent.installation === undefined ? kept.installation : sent.installation,
+    fittings: sent.fittings === undefined ? kept.fittings : sent.fittings,
+  };
 }
 
 const partySchema = z.object({
@@ -783,6 +895,7 @@ export const quotationHandlers = [
         tax_treatment: z.enum(TAX_TREATMENTS).default("domestic"),
         sales_type: z.string().nullish(),
         freight: freightInSchema.nullish(),
+        ...extraChargesInSchema,
       })
       .safeParse(await request.json());
     if (!parsed.success) {
@@ -800,7 +913,15 @@ export const quotationHandlers = [
       parsed.data.freight,
     );
     if (choiceRefusal !== null) return choiceRefusal;
+    const extrasRefusal = extraChargesRefusal(
+      parsed.data.sales_type ?? null,
+      parsed.data.tax_treatment === "domestic",
+      parsed.data.lines,
+      parsed.data,
+    );
+    if (extrasRefusal !== null) return extrasRefusal;
     const freight = pricedFreight(parsed.data.freight, domestic.lines);
+    const extras = pricedExtras(parsed.data, domestic.lines);
     // SO-010 · the preview shows the tax an export will store
     const treatment = parsed.data.tax_treatment;
     const priced = {
@@ -814,7 +935,9 @@ export const quotationHandlers = [
         price_list_ids: [priced.lines[0]?.price_list_id ?? ""],
         lines: priced.lines.map(({ line_no: _lineNo, ...line }) => line),
         freight,
-        totals: totalsOf(priced.lines, freight),
+        installation: extras.installation ?? null,
+        fittings: extras.fittings ?? null,
+        totals: totalsOf(priced.lines, freight, extras),
         warnings:
           provisional > 0
             ? [
@@ -843,6 +966,7 @@ export const quotationHandlers = [
         terms: z.string().max(2000).nullish(),
         lines: z.array(lineInSchema).max(200).default([]),
         freight: freightInSchema.nullish(),
+        ...extraChargesInSchema,
       })
       .safeParse(raw);
     if (!parsed.success) {
@@ -891,6 +1015,13 @@ export const quotationHandlers = [
       body.freight,
     );
     if (choiceRefusal !== null) return choiceRefusal;
+    const extrasRefusal = extraChargesRefusal(
+      salesType,
+      treatment === "domestic",
+      body.lines,
+      body,
+    );
+    if (extrasRefusal !== null) return extrasRefusal;
     const priced = { lines: domestic.lines.map((line) => withTaxTreatment(line, treatment)) };
 
     const quotation = mockDraft({
@@ -908,6 +1039,7 @@ export const quotationHandlers = [
       terms: body.terms ?? null,
       lines: priced.lines,
       freight: pricedFreight(body.freight, priced.lines),
+      ...pricedExtras(body, priced.lines),
       createdAt: new Date().toISOString(),
     });
     if (treatment !== "domestic") {
@@ -1008,6 +1140,8 @@ export const quotationHandlers = [
         lines: z.array(lineInSchema).max(200),
         /** QUOT-015 · omit to keep, null to remove */
         freight: freightInSchema.nullish(),
+        /** QUOT-016 · the same for installation and fittings */
+        ...extraChargesInSchema,
         expected_status: z.string().optional(),
       })
       .safeParse(raw);
@@ -1038,15 +1172,26 @@ export const quotationHandlers = [
       parsed.data.freight,
     );
     if (choiceRefusal !== null) return choiceRefusal;
-    const kept = takesGstChoice(draft.quotation.sales_type)
-      ? storedFreightIn(draft.quotation.freight ?? null)
-      : null;
+    const extrasRefusal = extraChargesRefusal(
+      draft.quotation.sales_type,
+      treatment === "domestic",
+      parsed.data.lines,
+      parsed.data,
+    );
+    if (extrasRefusal !== null) return extrasRefusal;
+    const takesCharges = takesGstChoice(draft.quotation.sales_type);
+    const kept = takesCharges ? storedFreightIn(draft.quotation.freight ?? null) : null;
     const freightIn = parsed.data.freight === undefined ? kept : parsed.data.freight;
+    const extrasIn = extrasAfterSave(
+      parsed.data,
+      takesCharges ? storedExtrasIn(draft.quotation) : {},
+    );
     const updated = withLines(
       draft.quotation,
       priced.lines.map((line) => withTaxTreatment(line, treatment)),
       [],
       priced.lines.length === 0 ? null : pricedFreight(freightIn, priced.lines),
+      pricedExtras(extrasIn, priced.lines),
     );
     mockDb.quotations = mockDb.quotations.map((item) => (item.id === updated.id ? updated : item));
     voidApproval(updated, "edited");

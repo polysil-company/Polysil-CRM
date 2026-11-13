@@ -10,15 +10,19 @@ import {
 import type { QuotePreview, QuoteLinesRequest } from "@/features/quotations/api/quotations.schemas";
 import {
   allowsGstChoice,
-  freightIssue,
+  CHARGE_KINDS,
+  chargeIssue,
   isPriceable,
   lineIssue,
-  NO_FREIGHT,
+  NO_CHARGES,
   pricedByKey,
   previewRequestFor,
   routeSaveErrors,
+  type ChargeKind,
+  type DraftCharges,
   type DraftFreight,
   type DraftLine,
+  type PerCharge,
   type PreviewPlan,
   type PricingContext,
 } from "@/features/quotations/lib/builder-lines";
@@ -35,6 +39,12 @@ const NOTHING_TO_PRICE: QuoteLinesRequest = { place_of_supply_territory_id: "", 
 const NO_PLACE: PreviewPlan = { request: null, keys: [] };
 
 const NO_CHOICES: readonly string[] = [];
+
+const NO_CHARGE_ERRORS: PerCharge<string | null> = {
+  freight: null,
+  installation: null,
+  fittings: null,
+};
 
 export function emptyLine(): DraftLine {
   return { key: createRequestId(), product: null, qty: "", discounts: ["", "", ""], gstSlab: null };
@@ -72,19 +82,20 @@ export interface PricedLines {
   readonly preview: UseQueryResult<QuotePreview>;
   readonly rowsWithIssues: number;
   readonly rowsReady: number;
-  /** QUOT-015 · A GST slab per line and freight are on offer for this sale. */
+  /** QUOT-015 · A GST slab per line and the charges are on offer for this sale. */
   readonly gstChoice: boolean;
   /** QUOT-015 · The slabs the dropdowns offer, besides each line's own HSN slab. */
   readonly slabChoices: readonly string[];
-  readonly freight: DraftFreight;
-  readonly setFreight: (next: DraftFreight) => void;
-  /** QUOT-015 · Why the freight can't go, in words: typed wrong, refused by a save or the preview. */
-  readonly freightError: string | null;
-  /** The freight must change before a save. */
-  readonly freightBlocks: boolean;
-  readonly setFreightSaveError: (error: string | null) => void;
-  /** QUOT-015 · The freight as the preview priced it; null without freight. */
-  readonly pricedFreight: QuotePreview["freight"];
+  /** QUOT-015, QUOT-016 · Transportation (freight), installation and fittings, as typed. */
+  readonly charges: DraftCharges;
+  readonly setCharge: (kind: ChargeKind, next: DraftFreight) => void;
+  /** Why each charge can't go, in words: typed wrong, refused by a save or the preview. */
+  readonly chargeErrors: PerCharge<string | null>;
+  /** A charge must change before a save. */
+  readonly chargesBlock: boolean;
+  readonly setChargeSaveErrors: (errors: PerCharge<string | null>) => void;
+  /** Each charge as the preview priced it; null when it has none. */
+  readonly pricedCharges: PerCharge<QuotePreview["freight"]>;
 }
 
 /**
@@ -95,12 +106,13 @@ export interface PricedLines {
 export function usePricedLines(
   context: PricingContext,
   initialLines: () => DraftLine[],
-  initialFreight: DraftFreight = NO_FREIGHT,
+  initialCharges: DraftCharges = NO_CHARGES,
 ): PricedLines {
   const [lines, setLines] = useState<DraftLine[]>(initialLines);
   const [lineErrors, setLineErrors] = useState<Readonly<Record<string, string>>>({});
-  const [freight, setFreightState] = useState<DraftFreight>(initialFreight);
-  const [freightSaveError, setFreightSaveError] = useState<string | null>(null);
+  const [charges, setCharges] = useState<DraftCharges>(initialCharges);
+  const [chargeSaveErrors, setChargeSaveErrors] =
+    useState<PerCharge<string | null>>(NO_CHARGE_ERRORS);
   const gstChoice = allowsGstChoice(context);
   const slabChoices = useQuery({ ...gstSlabChoicesQueryOptions(), enabled: gstChoice });
 
@@ -109,8 +121,8 @@ export function usePricedLines(
     () =>
       context.placeOfSupplyTerritoryId === ""
         ? NO_PLACE
-        : previewRequestFor(lines, context, freight),
-    [lines, context, freight],
+        : previewRequestFor(lines, context, charges),
+    [lines, context, charges],
   );
   const debouncedPlan = useDebouncedValue(plan, PREVIEW_DEBOUNCE_MS);
   const preview = useQuery({
@@ -138,12 +150,23 @@ export function usePricedLines(
       : null;
   const previewErrors = previewRefusal?.lines ?? {};
   const rowsReady = lines.filter(isPriceable).length;
-  // What must be fixed before a save, then what a save or the preview refused.
-  const freightBlock =
-    (gstChoice ? freightIssue(freight) : null) ??
-    (gstChoice && freight.amount.trim() !== "" && rowsReady === 0 ? "Add an item first" : null) ??
-    previewRefusal?.freight ??
-    null;
+  // Per charge: what must be fixed before a save, then what a save or the preview refused.
+  const blockOf = (kind: ChargeKind): string | null => {
+    const charge = charges[kind];
+    return (
+      (gstChoice ? chargeIssue(charge) : null) ??
+      (gstChoice && charge.amount.trim() !== "" && rowsReady === 0 ? "Add an item first" : null) ??
+      previewRefusal?.charges[kind] ??
+      null
+    );
+  };
+  const chargeBlocks: PerCharge<string | null> = {
+    freight: blockOf("freight"),
+    installation: blockOf("installation"),
+    fittings: blockOf("fittings"),
+  };
+  const pricedChargeOf = (kind: ChargeKind): QuotePreview["freight"] =>
+    plan.request?.[kind] === undefined ? null : (snapshot?.preview[kind] ?? null);
 
   return {
     lines,
@@ -179,20 +202,28 @@ export function usePricedLines(
     previewFailed:
       previewRefusal !== null &&
       Object.keys(previewErrors).length === 0 &&
-      previewRefusal.freight === null,
+      CHARGE_KINDS.every((kind) => previewRefusal.charges[kind] === null),
     preview,
     rowsWithIssues: lines.filter((line) => lineIssue(line) !== null).length,
     rowsReady,
     gstChoice,
     slabChoices: slabChoices.data ?? NO_CHOICES,
-    freight,
-    setFreight: (next) => {
-      setFreightState(next);
-      setFreightSaveError(null);
+    charges,
+    setCharge: (kind, next) => {
+      setCharges((current) => ({ ...current, [kind]: next }));
+      setChargeSaveErrors((current) => ({ ...current, [kind]: null }));
     },
-    freightError: freightBlock ?? freightSaveError,
-    freightBlocks: freightBlock !== null,
-    setFreightSaveError,
-    pricedFreight: plan.request?.freight === undefined ? null : (snapshot?.preview.freight ?? null),
+    chargeErrors: {
+      freight: chargeBlocks.freight ?? chargeSaveErrors.freight,
+      installation: chargeBlocks.installation ?? chargeSaveErrors.installation,
+      fittings: chargeBlocks.fittings ?? chargeSaveErrors.fittings,
+    },
+    chargesBlock: CHARGE_KINDS.some((kind) => chargeBlocks[kind] !== null),
+    setChargeSaveErrors,
+    pricedCharges: {
+      freight: pricedChargeOf("freight"),
+      installation: pricedChargeOf("installation"),
+      fittings: pricedChargeOf("fittings"),
+    },
   };
 }

@@ -23,7 +23,7 @@ if (serverUrl.protocol !== "https:") {
 
 const config: CapacitorConfig = {
   appId: "com.polysil.crm",
-  appName: "Polysil",
+  appName: "Polysil Sarthi",
   webDir: "www",
   server: {
     url: serverUrl.origin,

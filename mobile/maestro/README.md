@@ -83,7 +83,7 @@ If a step can't find something on screen, run `maestro studio` (or `maestro hier
 
 | Flow               | Tag   | Checks                                                                                               |
 | ------------------ | ----- | ---------------------------------------------------------------------------------------------------- |
-| `01-launch`        | smoke | Opens on sign-in with the Polysil logo and "CRM & DMS"                                               |
+| `01-launch`        | smoke | Opens on sign-in with the Polysil logo and "Your Digital Business Partner"                           |
 | `02-sign-in`       | smoke | Staff email sign-in lands on the Dashboard                                                           |
 | `03-menu-pages`    | smoke | Leads, Quotations, Sales orders, Tasks and Visits open from the menu                                 |
 | `03b-back-button`  | smoke | The phone's back button returns to the previous screen and keeps the app open (needs APK 0.1.2)      |

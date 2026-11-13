@@ -121,7 +121,7 @@ const COPY: Readonly<Record<string, SettingCopy>> = {
   },
   sample_max_value: { title: "The largest sample order, in rupees", section: "orders" },
   gst_slab_choices: {
-    title: "GST slabs an item or freight can be set to",
+    title: "GST slabs an item or a charge can be set to",
     section: "orders",
     note: "Commercial and industrial quotations and orders. Each item still offers its own HSN slab.",
   },

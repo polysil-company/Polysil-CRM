@@ -227,7 +227,24 @@ describe("[QUOT-015] A changed GST slab and freight on the document", () => {
     const hsn = `${String(Number(first.gst_slab))}%`;
     expect(within(table).getByText(`Changed from HSN ${hsn}`)).toBeInTheDocument();
     const totals = screen.getByLabelText("Totals");
-    expect(within(totals).getByText("Freight (GST 40%)")).toBeInTheDocument();
+    expect(within(totals).getByText("Transportation (GST 40%)")).toBeInTheDocument();
     expect(within(totals).getByText(formatInr("1000.00", { paise: true }))).toBeInTheDocument();
+  });
+
+  it("[QUOT-016] prints installation and fittings in the totals, each with its GST", async () => {
+    const wire = mockQuotation((quotation) => quotation.status === "accepted");
+    wire.installation = mockFreight(800_000, 18, false);
+    wire.fittings = mockFreight(250_000, 5, true);
+    wire.totals = totalsOf(wire.lines, null, {
+      installation: wire.installation,
+      fittings: wire.fittings,
+    });
+    renderWithProviders(<QuotationDetail quotationId={wire.id} />);
+
+    const totals = await screen.findByLabelText("Totals");
+    expect(within(totals).getByText("Installation charges (GST 18%)")).toBeInTheDocument();
+    expect(within(totals).getByText(formatInr("8000.00", { paise: true }))).toBeInTheDocument();
+    expect(within(totals).getByText("Fittings material charges (GST 5%)")).toBeInTheDocument();
+    expect(within(totals).queryByText(/Transportation/)).not.toBeInTheDocument();
   });
 });

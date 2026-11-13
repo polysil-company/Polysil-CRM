@@ -20,8 +20,17 @@ import {
 import { ImportDialog } from "@/features/imports/components/import-dialog";
 import type { QuotePreview } from "@/features/quotations/api/quotations.schemas";
 import type { PricedLines } from "@/features/quotations/hooks/use-priced-lines";
-import { draftLinesFromImport } from "@/features/quotations/lib/builder-lines";
-import { formatRate, parseWarnings } from "@/features/quotations/lib/quotation-labels";
+import {
+  CHARGE_KINDS,
+  draftLinesFromImport,
+  type ChargeKind,
+  type PerCharge,
+} from "@/features/quotations/lib/builder-lines";
+import {
+  CHARGE_LABELS,
+  formatRate,
+  parseWarnings,
+} from "@/features/quotations/lib/quotation-labels";
 import { toUserFacingError } from "@/lib/api/error-messages";
 import { createRequestId } from "@/lib/api/request-id";
 import { formatCount, formatInr } from "@/lib/format";
@@ -91,7 +100,7 @@ export function PricedItemsCard({
             </Button>
           )}
         </div>
-        {priced.gstChoice ? <FreightEditor priced={priced} /> : null}
+        {priced.gstChoice ? <ChargesEditor priced={priced} /> : null}
         {importInto === undefined ? null : (
           <ImportDialog
             kind="lines"
@@ -115,68 +124,87 @@ export function PricedItemsCard({
   );
 }
 
-/** The value the freight's slab dropdown uses for "no slab picked". */
-const DEFAULT_FREIGHT_SLAB = "default";
+/** The value a charge's slab dropdown uses for "no slab picked". */
+const DEFAULT_CHARGE_SLAB = "default";
 
 /**
- * QUOT-015 · One freight charge before tax, for a commercial or industrial sale. Without a slab
- * it takes the highest among the items; the backend prices it like a line of one.
+ * QUOT-015, QUOT-016 · The charges before tax on a commercial or industrial sale:
+ * transportation (the API's freight), installation and fittings material (FS-069, FS-088).
+ * Each is optional; the backend prices each like a line of one.
  */
-function FreightEditor({ priced }: { priced: PricedLines }): React.JSX.Element {
-  const { freight, freightError, pricedFreight } = priced;
-  const errorId = "freight-error";
+function ChargesEditor({ priced }: { priced: PricedLines }): React.JSX.Element {
+  return (
+    <fieldset className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:p-4">
+      <legend className="sr-only">Other charges</legend>
+      <div className="flex flex-col gap-0.5">
+        <p className="text-sm font-medium text-foreground">Other charges</p>
+        <p className="text-xs text-muted-foreground">
+          Optional, before tax. Each is taxed on its own and added to the taxable value, never to
+          the discount.
+        </p>
+      </div>
+      <div className="flex flex-col divide-y divide-border">
+        {CHARGE_KINDS.map((kind) => (
+          <ChargeRow key={kind} kind={kind} priced={priced} />
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** One charge: its amount, the GST on it, and what the preview priced. */
+function ChargeRow({ kind, priced }: { kind: ChargeKind; priced: PricedLines }): React.JSX.Element {
+  const charge = priced.charges[kind];
+  const error = priced.chargeErrors[kind];
+  const pricedCharge = priced.pricedCharges[kind];
+  const label = CHARGE_LABELS[kind];
+  const errorId = `${kind}-error`;
   const items = [
-    { value: DEFAULT_FREIGHT_SLAB, label: "Highest of the items" },
-    ...slabOptions(priced.slabChoices, freight.gstSlab).map((slab) => ({
+    { value: DEFAULT_CHARGE_SLAB, label: label.defaultSlab },
+    ...slabOptions(priced.slabChoices, charge.gstSlab).map((slab) => ({
       value: slab,
       label: formatRate(slab),
     })),
   ];
   return (
-    <fieldset
-      aria-describedby={freightError === null ? undefined : errorId}
-      className={cn(
-        "flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:p-4",
-        freightError !== null && "border-danger",
-      )}
-    >
-      <legend className="sr-only">Freight</legend>
+    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
       <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6">
-          <label htmlFor="freight-amount" className="text-xs text-muted-foreground">
-            Freight before tax (optional)
+          <label htmlFor={`${kind}-amount`} className="text-xs text-muted-foreground">
+            {label.name} before tax (optional)
           </label>
           <InputGroup>
             <InputGroupAddon align="start">₹</InputGroupAddon>
             <InputGroupInput
-              id="freight-amount"
+              id={`${kind}-amount`}
               inputMode="decimal"
               autoComplete="off"
               placeholder="0"
-              value={freight.amount}
-              aria-invalid={freightError === null ? undefined : true}
+              value={charge.amount}
+              aria-invalid={error === null ? undefined : true}
+              aria-describedby={error === null ? undefined : errorId}
               onChange={(event) => {
-                priced.setFreight({ ...freight, amount: event.target.value });
+                priced.setCharge(kind, { ...charge, amount: event.target.value });
               }}
             />
           </InputGroup>
         </div>
         <div className="col-span-12 flex flex-col gap-1.5 sm:col-span-6">
-          <label htmlFor="freight-gst" className="text-xs text-muted-foreground">
-            GST on freight
+          <label htmlFor={`${kind}-gst`} className="text-xs text-muted-foreground">
+            GST on {label.name.toLowerCase()}
           </label>
           <Select
             items={items}
-            value={freight.gstSlab === null ? DEFAULT_FREIGHT_SLAB : slabKey(freight.gstSlab)}
+            value={charge.gstSlab === null ? DEFAULT_CHARGE_SLAB : slabKey(charge.gstSlab)}
             onValueChange={(next) => {
               if (next === null) return;
-              priced.setFreight({
-                ...freight,
-                gstSlab: next === DEFAULT_FREIGHT_SLAB ? null : next,
+              priced.setCharge(kind, {
+                ...charge,
+                gstSlab: next === DEFAULT_CHARGE_SLAB ? null : next,
               });
             }}
           >
-            <SelectTrigger id="freight-gst">
+            <SelectTrigger id={`${kind}-gst`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -189,22 +217,22 @@ function FreightEditor({ priced }: { priced: PricedLines }): React.JSX.Element {
           </Select>
         </div>
       </div>
-      {pricedFreight === null ? null : (
+      {pricedCharge === null ? null : (
         <p className={cn("text-xs text-foreground tabular-nums", priced.pricing && "opacity-60")}>
-          GST {formatRate(pricedFreight.gstSlab)}
-          {pricedFreight.gstSlabChosen ? "" : " (highest of the items)"}:{" "}
-          {Number(pricedFreight.igst.amount) > 0
-            ? formatInr(pricedFreight.igst.amount, { paise: true })
-            : `${formatInr(pricedFreight.cgst.amount, { paise: true })} + ${formatInr(pricedFreight.sgst.amount, { paise: true })}`}{" "}
-          · Freight total {formatInr(pricedFreight.total, { paise: true })}
+          GST {formatRate(pricedCharge.gstSlab)}
+          {pricedCharge.gstSlabChosen ? "" : ` (${label.defaultNote})`}:{" "}
+          {Number(pricedCharge.igst.amount) > 0
+            ? formatInr(pricedCharge.igst.amount, { paise: true })
+            : `${formatInr(pricedCharge.cgst.amount, { paise: true })} + ${formatInr(pricedCharge.sgst.amount, { paise: true })}`}{" "}
+          · {label.name} total {formatInr(pricedCharge.total, { paise: true })}
         </p>
       )}
-      {freightError === null ? null : (
+      {error === null ? null : (
         <p id={errorId} role="alert" className="text-xs text-danger">
-          {freightError}
+          {error}
         </p>
       )}
-    </fieldset>
+    </div>
   );
 }
 
@@ -214,7 +242,11 @@ export function PricedSummary({ priced }: { priced: PricedLines }): React.JSX.El
     <>
       <BuilderTotals
         totals={priced.totals}
-        freightAmount={priced.snapshot?.preview.freight?.amount ?? null}
+        chargeAmounts={{
+          freight: priced.snapshot?.preview.freight?.amount ?? null,
+          installation: priced.snapshot?.preview.installation?.amount ?? null,
+          fittings: priced.snapshot?.preview.fittings?.amount ?? null,
+        }}
         intraState={priced.snapshot?.preview.intraState ?? true}
         stale={priced.pricing}
       />
@@ -255,7 +287,7 @@ export function saveBlocker(priced: PricedLines): string | null {
   if (priced.previewFailed || Object.keys(priced.previewErrors).length > 0) {
     return "Fix the pricing first.";
   }
-  if (priced.freightBlocks) return "Fix the freight first.";
+  if (priced.chargesBlock) return "Fix the other charges first.";
   return null;
 }
 
@@ -305,25 +337,30 @@ export function TextField({
 
 function BuilderTotals({
   totals,
-  freightAmount,
+  chargeAmounts,
   intraState,
   stale,
 }: {
   totals: QuotePreview["totals"] | null;
   /**
-   * APP-009 (live test Y-03) · The priced freight before tax. The backend returns it beside the
-   * totals (`freight.amount`), not inside them, so `totals.freight` is only the mock's.
+   * APP-009 (live test Y-03) · Each priced charge before tax. The backend returns them beside
+   * the totals (`freight.amount`), not inside them, so `totals.freight` is only the mock's.
    */
-  freightAmount: string | null;
+  chargeAmounts: PerCharge<string | null>;
   intraState: boolean;
   stale: boolean;
 }): React.JSX.Element {
-  const freight = freightAmount ?? totals?.freight ?? null;
+  // QUOT-015, QUOT-016 · Charges sit inside the taxable value, never in gross or discount.
+  const chargeRows = CHARGE_KINDS.flatMap((kind) => {
+    const amount = chargeAmounts[kind] ?? totals?.[kind] ?? null;
+    return amount !== null && Number(amount) > 0
+      ? [{ label: CHARGE_LABELS[kind].name, value: amount }]
+      : [];
+  });
   const rows: { label: string; value: string | null; strong?: boolean }[] = [
     { label: "Gross", value: totals?.gross ?? null },
     { label: "Discount", value: totals?.discount ?? null },
-    // QUOT-015 · Freight sits inside the taxable value, never in gross or discount.
-    ...(freight !== null && Number(freight) > 0 ? [{ label: "Freight", value: freight }] : []),
+    ...chargeRows,
     { label: "Taxable value", value: totals?.taxable ?? null },
     ...(intraState
       ? [

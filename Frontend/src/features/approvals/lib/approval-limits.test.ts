@@ -78,3 +78,27 @@ describe("[APPR-002] approval limit ladders", () => {
     expect(formatLimit(null, "pct")).toBe("No limit");
   });
 });
+
+describe("[APPR-003] the industrial order ladder (FS-089)", () => {
+  const industrial: Threshold[] = [
+    { ...row("industrial_order", "state_manager", "500000.00"), unit: "inr" },
+    { ...row("industrial_order", "regional_manager", "2500000.00"), unit: "inr" },
+    { ...row("industrial_order", "md_ceo", null), unit: "inr" },
+  ];
+
+  it("climbs State Manager, Regional Manager, then the MD / CEO, with no District Manager", () => {
+    const ladder = ladderFor([...ROWS, ...industrial], "industrial_order", null);
+    expect(ladder.map((step) => [step.role, step.row?.maxAmount ?? "none"])).toEqual([
+      ["state_manager", "500000.00"],
+      ["regional_manager", "2500000.00"],
+      ["md_ceo", "none"],
+    ]);
+    expect(boundsFor(ladder, "regional_manager")).toEqual({ above: 500_000, under: null });
+  });
+
+  it("lets only the MD / CEO have no limit", () => {
+    expect(mayBeUnlimited("industrial_order", "md_ceo")).toBe(true);
+    expect(mayBeUnlimited("industrial_order", "regional_manager")).toBe(false);
+    expect(mayBeUnlimited("sales_order", "regional_manager")).toBe(true);
+  });
+});

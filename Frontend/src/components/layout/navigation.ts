@@ -37,6 +37,7 @@ import type { Route } from "next";
 
 import type { IconGlyph } from "@/components/ui/icon";
 import { can, canApprove, type ModuleCode, type ModulePermission } from "@/lib/auth/permissions";
+import { APP_NAME } from "@/lib/brand";
 import type { DataId } from "@/lib/data-ids";
 import { clientEnv } from "@/lib/env/client";
 
@@ -636,7 +637,7 @@ export interface PageHeading {
 export function findPageHeading(pathname: string): PageHeading {
   const item = findActiveNavItem(pathname);
   if (item === undefined) {
-    return { title: "Polysil CRM" };
+    return { title: APP_NAME };
   }
   if (item.href === pathname && item.description !== undefined) {
     return { title: item.label, description: item.description };

@@ -101,7 +101,7 @@ describe("[APP-005] page headings in the top bar", () => {
       description: "Leads, quotations, orders and service at a glance.",
     });
     expect(findPageHeading("/leads/lead-10001")).toEqual({ title: "Leads" });
-    expect(findPageHeading("/unknown")).toEqual({ title: "Polysil CRM" });
+    expect(findPageHeading("/unknown")).toEqual({ title: "Polysil Sarthi" });
   });
 
   it("gives every built page a description, since pages no longer show one", () => {

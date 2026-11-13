@@ -274,8 +274,8 @@ describe("[QUOT-015] An order's GST slab per item, and freight", () => {
 
     await user.click(within(item).getByRole("combobox", { name: "GST for item 1" }));
     await user.click(await screen.findByRole("option", { name: "40%" }));
-    await user.type(screen.getByLabelText("Freight before tax (optional)"), "800");
-    await user.click(screen.getByRole("combobox", { name: "GST on freight" }));
+    await user.type(screen.getByLabelText("Transportation before tax (optional)"), "800");
+    await user.click(screen.getByRole("combobox", { name: "GST on transportation" }));
     await user.click(await screen.findByRole("option", { name: "5%" }));
     expect(await screen.findByText(/^GST 5%:/, {}, PRICED)).toBeInTheDocument();
 
@@ -298,6 +298,48 @@ describe("[QUOT-015] An order's GST slab per item, and freight", () => {
     expect(saved?.gst_changed_lines).toBe(1);
   });
 
+  it(
+    "[QUOT-016] saves installation and fittings charges on an industrial order",
+    PRICING_TEST,
+    async () => {
+      signInAs("admin");
+      const user = show(<NewDirectOrder leadId={leadAt("qualified")} />);
+      await screen.findByRole("form", { name: "New order" });
+      await user.click(screen.getByRole("radio", { name: "Industrial" }));
+      await addPipe(user, "10");
+      await within(screen.getByRole("listitem", { name: "Item 1" })).findByText("Rate", {}, PRICED);
+
+      await user.type(screen.getByLabelText("Installation charges before tax (optional)"), "5000");
+      await user.type(
+        screen.getByLabelText("Fittings material charges before tax (optional)"),
+        "1200.50",
+      );
+      const totals = screen.getByLabelText("Totals");
+      expect(
+        await within(totals).findByText("Fittings material charges", {}, PRICED),
+      ).toBeInTheDocument();
+
+      const save = screen.getByRole("button", { name: "Save draft order" });
+      await waitFor(() => {
+        expect(save).toBeEnabled();
+      }, PRICED);
+      await user.click(save);
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+      const [saved] = mockDb.orders;
+      expect(saved?.order_type).toBe("industrial");
+      expect(saved?.installation).toMatchObject({
+        amount: "5000.00",
+        gst_slab: "18.000",
+        gst_slab_chosen: false,
+        total: "5900.00",
+      });
+      expect(saved?.fittings).toMatchObject({ amount: "1200.50", gst_slab_chosen: false });
+      expect(saved?.freight).toBeNull();
+    },
+  );
+
   it("puts a refused freight on the freight field", PRICING_TEST, async () => {
     signInAs("admin");
     server.use(
@@ -318,7 +360,7 @@ describe("[QUOT-015] An order's GST slab per item, and freight", () => {
     await screen.findByRole("form", { name: "New order" });
     await addPipe(user, "10");
     await within(screen.getByRole("listitem", { name: "Item 1" })).findByText("Rate", {}, PRICED);
-    await user.type(screen.getByLabelText("Freight before tax (optional)"), "800");
+    await user.type(screen.getByLabelText("Transportation before tax (optional)"), "800");
     const save = screen.getByRole("button", { name: "Save draft order" });
     await waitFor(() => {
       expect(save).toBeEnabled();
