@@ -1,0 +1,15 @@
+# Smoke · Sign out returns to the sign-in screen.
+appId: com.polysil.crm
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- tapOn: "Account menu for .*"
+- tapOn: "Sign out"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 30000
+- takeScreenshot: 08-signed-out

@@ -1,0 +1,39 @@
+# The frontend container. Used only from inside polysil-deploy-hook (redeploy.sh),
+# where the checkout lives at /srv/frontend-src: the build context below is a path
+# in that container, which is the docker client that tars it for the build.
+
+name: polysil-frontend
+
+services:
+  frontend:
+    build:
+      context: /srv/frontend-src/Frontend
+      dockerfile: Dockerfile.polysil
+      args:
+        RELEASE: ${RELEASE:-unknown}
+    image: polysil-frontend:staging
+    # Caddy on distributed-file-system_default reaches it by this name.
+    container_name: polysil-frontend
+    restart: unless-stopped
+    networks:
+      # the API by name (API_PROXY_TARGET), for the rewrite next.config keeps
+      staging:
+      # Caddy
+      proxy:
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  staging:
+    external: true
+    name: polysil-staging_default
+  proxy:
+    external: true
+    name: distributed-file-system_default

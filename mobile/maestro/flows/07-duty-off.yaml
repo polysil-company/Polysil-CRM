@@ -1,0 +1,23 @@
+# Duty · Go off duty: what waits is sent, the server ends the duty, recording stops.
+appId: com.polysil.crm
+tags: [duty]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Duty"
+- runFlow:
+    when:
+      visible: "Go off duty"
+    commands:
+      - tapOn: "Go off duty"
+- extendedWaitUntil:
+    visible: "Off duty: your route isn't recorded."
+    timeout: 45000
+- assertVisible: "Go on duty"
+- takeScreenshot: 07-off-duty

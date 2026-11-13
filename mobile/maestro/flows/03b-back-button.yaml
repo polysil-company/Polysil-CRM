@@ -1,0 +1,30 @@
+# Smoke · The phone's back button goes to the previous screen, and doesn't close the app (TRK-008).
+appId: com.polysil.crm
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Leads"
+- assertVisible: "Leads"
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Tasks"
+- assertVisible: "Tasks"
+- pressKey: back
+- waitForAnimationToEnd
+# Back from Tasks lands on Leads, still inside the app.
+- assertVisible: "Leads"
+- assertVisible: "Open menu"
+- takeScreenshot: 03b-back-to-leads
+- pressKey: back
+- waitForAnimationToEnd
+# One more back is the screen before Leads; the app is still open.
+- assertVisible: "Open menu"
+- takeScreenshot: 03b-back-again

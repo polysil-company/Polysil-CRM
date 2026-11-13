@@ -1,0 +1,11 @@
+# Smoke · Staff sign in and land on the dashboard.
+appId: com.polysil.crm
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- assertVisible: "Dashboard"
+- takeScreenshot: 02-dashboard

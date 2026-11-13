@@ -1,0 +1,201 @@
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { Toaster } from "@/components/ui/sonner";
+import type { LeadStage } from "@/features/leads/api/leads.schemas";
+import { buildApiUrl } from "@/lib/api/url";
+import type { Role } from "@/lib/auth/roles";
+import { writeMockRole } from "@/lib/dev/mock-settings";
+import { MOCK_STAFF } from "@/mocks/data/reference";
+import { mockMeFor } from "@/mocks/data/sessions";
+import { mockDb, resetMockDb } from "@/mocks/db";
+import { server } from "@/mocks/node";
+import { renderWithProviders } from "@/test/render";
+
+import { LeadDetail } from "./lead-detail";
+
+// A State Manager may delete leads (RBAC.md §6.1, BE-037), so the page's Delete needs a router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), notFound: vi.fn() }));
+
+function leadAt(stage: LeadStage): (typeof mockDb.leads)[number] {
+  const lead = mockDb.leads.find((item) => item.stage === stage && item.merged_into === null);
+  if (lead === undefined) {
+    throw new Error(`No ${stage} lead in the mock database`);
+  }
+  return lead;
+}
+
+/** The session for the screen, and the same role for the mock backend's answers. */
+function signInAs(role: Role): void {
+  writeMockRole(role);
+  server.use(http.get(buildApiUrl("/auth/me"), () => HttpResponse.json(mockMeFor(role))));
+}
+
+function showLead(leadId: string): ReturnType<typeof userEvent.setup> {
+  const user = userEvent.setup();
+  renderWithProviders(
+    <>
+      <LeadDetail leadId={leadId} />
+      <Toaster />
+    </>,
+  );
+  return user;
+}
+
+describe("[LEAD-008] LeadAssignDialog", () => {
+  afterEach(() => {
+    writeMockRole("state_manager");
+    resetMockDb();
+    server.events.removeAllListeners("request:start");
+  });
+
+  it("changes the owner and the partner, and shows them on the lead", async () => {
+    signInAs("state_manager");
+    const lead = leadAt("contacted");
+    const newOwner = MOCK_STAFF.find((person) => person.id !== lead.owner?.id);
+    const previousOwner = lead.owner?.full_name ?? null;
+    const user = showLead(lead.id);
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const save = within(dialog).getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    const owner = within(dialog).getByRole("combobox", { name: "Owner" });
+    await waitFor(() => {
+      expect(owner).toBeEnabled();
+    });
+    await user.clear(owner);
+    await user.type(owner, newOwner?.full_name.split(" ")[0] ?? "");
+    await user.click(
+      await screen.findByRole("option", { name: new RegExp(newOwner?.full_name ?? "") }),
+    );
+
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    await user.clear(partner);
+    await user.type(partner, "Khodiyar");
+    await user.click(await screen.findByRole("option", { name: /Khodiyar Irrigation/ }));
+
+    await user.click(save);
+
+    expect(await screen.findByText("Lead assigned")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Assign lead" })).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText("Khodiyar Irrigation · Dealer")).toBeInTheDocument();
+    expect(lead.owner?.id).toBe(newOwner?.id);
+    // The history names both people and the partner (BE-006).
+    const handover =
+      previousOwner === null
+        ? `assigned the lead to ${newOwner?.full_name ?? ""}`
+        : `handed the lead from ${previousOwner} to ${newOwner?.full_name ?? ""}`;
+    expect(
+      await screen.findByText(`${handover} and made Khodiyar Irrigation the channel partner`, {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("tells someone who may not set owners, and still lets them change the partner", async () => {
+    signInAs("employee");
+    const lead = leadAt("contacted");
+    const user = showLead(lead.id);
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+
+    expect(
+      await within(dialog).findByText(/Only a manager can change the owner/),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: "Owner" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("combobox", { name: "Channel partner" })).toBeInTheDocument();
+  });
+
+  it("holds no text for 'no channel partner', so a search is only what was typed (F-9)", async () => {
+    signInAs("state_manager");
+    const lead = mockDb.leads.find(
+      (item) => item.stage === "contacted" && item.assigned_partner === null,
+    );
+    if (lead === undefined) throw new Error("No contacted lead without a partner");
+    const searches: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith("/lookups/partners"))
+        searches.push(url.searchParams.get("q") ?? "");
+    });
+    const user = showLead(lead.id);
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    expect(partner).toHaveValue("");
+    expect(partner).toHaveAttribute("placeholder", "No channel partner");
+
+    await user.type(partner, "Khodiyar");
+    await waitFor(() => {
+      expect(searches).toContain("Khodiyar");
+    });
+    // It used to search "No channel partnerKhodiyar".
+    expect(searches.filter((q) => q !== "").every((q) => "Khodiyar".startsWith(q))).toBe(true);
+  });
+
+  it("refreshes the lead's quotations when the partner changes: drafts are re-priced", async () => {
+    signInAs("state_manager");
+    const lead = leadAt("contacted");
+    const user = userEvent.setup();
+    const { queryClient } = renderWithProviders(<LeadDetail leadId={lead.id} />);
+    queryClient.setQueryData(["quotations", "probe"], "before");
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    await user.clear(partner);
+    await user.type(partner, "Khodiyar");
+    await user.click(await screen.findByRole("option", { name: /Khodiyar Irrigation/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryState(["quotations", "probe"])?.isInvalidated).toBe(true);
+    });
+  });
+
+  it("puts a refused partner on the partner field", async () => {
+    signInAs("state_manager");
+    server.use(
+      http.post(buildApiUrl("/leads/:leadId/assign"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "validation_error",
+              message: "Some fields need correcting.",
+              fields: { assigned_partner_id: "not in your scope" },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = showLead(leadAt("contacted").id);
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }));
+    const dialog = await screen.findByRole("dialog", { name: "Assign lead" });
+    const partner = within(dialog).getByRole("combobox", { name: "Channel partner" });
+    await user.clear(partner);
+    await user.type(partner, "Babra");
+    await user.click(await screen.findByRole("option", { name: /Babra Farm Supplies/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(await within(dialog).findByText("This partner isn't in your area")).toBeInTheDocument();
+    expect(partner).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("offers no reassignment on a closed lead", async () => {
+    signInAs("state_manager");
+    showLead(leadAt("won").id);
+
+    expect(await screen.findByRole("heading", { name: "Details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
+  });
+});

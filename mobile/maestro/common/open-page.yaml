@@ -1,0 +1,6 @@
+# Opens a page from the phone menu. Pass env PAGE: the menu label, e.g. "Leads".
+appId: com.polysil.crm
+---
+- tapOn: "Open menu"
+- tapOn: ${PAGE}
+- waitForAnimationToEnd
