@@ -142,9 +142,9 @@
     </tbody>
     <tbody class="totals">
       <tr><td class="label" colspan="5">Sub Total</td><td class="n" colspan="2">{{ sub_total | rupees }}</td></tr>
-      {% if q.freight_amount %}
-      <tr><td class="label" colspan="5">Freight</td><td class="n" colspan="2">{{ q.freight_amount | rupees }}</td></tr>
-      {% endif %}
+      {% for c in charges %}
+      <tr><td class="label" colspan="5">{{ c.label }}</td><td class="n" colspan="2">{{ c.amount | rupees }}</td></tr>
+      {% endfor %}
       {% if tax_rows == 'intra' %}
       <tr><td class="label" colspan="5">CGST{% if cgst_rate is not none %} @ {{ cgst_rate | pct }}%{% endif %}</td><td class="n" colspan="2">{{ q.cgst | rupees }}</td></tr>
       <tr><td class="label" colspan="5">SGST{% if sgst_rate is not none %} @ {{ sgst_rate | pct }}%{% endif %}</td><td class="n" colspan="2">{{ q.sgst | rupees }}</td></tr>

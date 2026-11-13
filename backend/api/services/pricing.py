@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -44,12 +44,15 @@ from api.db import locks
 from api.domain.money import round2
 from api.domain.pricing.resolve import applicable, mixed_list_warning, pick
 from api.domain.pricing.tax import (
+    CHARGE_KINDS as CHARGE_KINDS,
+)
+from api.domain.pricing.tax import (
     GST_SLABS,
     MAX_DOCUMENT_TOTAL,
     MAX_QTY,
-    compute_freight,
+    compute_charge,
     compute_line,
-    default_freight_slab,
+    default_charge_slab,
     document_totals,
 )
 from api.domain.pricing.types import (
@@ -347,7 +350,7 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                          existing: bool = False,
                          tax_as_of: dt.date | None = None,
                          tax_treatment: str = "domestic",
-                         freight: FreightSpec | None = None,
+                         charges: Mapping[str, FreightSpec | None] | None = None,
                          offered: Sequence[Decimal] | None = None) -> PricedContext:
     """Resolve and price a set of lines against the masters in force on a date.
     Stores nothing and locks nothing (rule 14).
@@ -379,7 +382,8 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     forgetting it (FS-061). Export, sample, replacement and `None` map to general
     lists only.
 
-    `freight` and each `LineSpec.gst_slab` are FS-069's. Every caller passes what
+    `charges` (freight, installation, fittings; FS-069, FS-088) and each
+    `LineSpec.gst_slab` are FS-069's. Every caller passes what
     the document holds, so a re-price keeps them (rule 9). The rules that make them
     legal live here, not in the callers: only commercial and industrial take them
     (rule 2), freight needs a goods line (rule 5), and the ceiling counts freight
@@ -397,14 +401,16 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     if len(lines) > MAX_LINES:
         raise ValidationFailed(fields={"lines": f"At most {MAX_LINES} lines."})
     allows_choice = sales_type in CHOICE_TYPES and tax_treatment == "domestic"
-    if freight is not None:
+    present = {k: c for k in CHARGE_KINDS if (c := (charges or {}).get(k)) is not None}
+    for kind in present:
         if not allows_choice:
-            raise ValidationFailed("Freight is for commercial and industrial documents only.",
-                                   code="freight_not_allowed", fields={"freight": "Not allowed."})
+            raise ValidationFailed(f"{_NAME[kind]} is for commercial and industrial documents "
+                                   f"only.", code=_code(kind, "not_allowed"),
+                                   fields={kind: "Not allowed."})
         if not lines:
-            raise ValidationFailed("Freight needs at least one goods line.",
-                                   code="freight_without_lines",
-                                   fields={"freight": "Add a line first."})
+            raise ValidationFailed(f"{_NAME[kind]} needs at least one goods line.",
+                                   code=_code(kind, "without_lines"),
+                                   fields={kind: "Add a line first."})
 
     target, tier, pos_state = await resolve_scope(
         db, partner_id=partner_id, place_of_supply_territory_id=place_of_supply_territory_id)
@@ -467,10 +473,10 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
     refused.update({f"lines[{i}].gst_slab": f"{s:f} % is not one of the GST slabs offered."
                     for i, s in picked.items()
                     if s is not None and s not in _menu(lines[i].typed)})
-    if freight is not None and freight.gst_slab is not None \
-            and freight.gst_slab not in _menu(freight.typed):
-        refused["freight.gst_slab"] = (f"{freight.gst_slab:f} % is not one of the GST "
-                                       f"slabs offered.")
+    for kind, spec in present.items():
+        if spec.gst_slab is not None and spec.gst_slab not in _menu(spec.typed):
+            refused[f"{kind}.gst_slab"] = (f"{spec.gst_slab:f} % is not one of the GST "
+                                           f"slabs offered.")
     if refused:
         code = ("gst_choice_not_allowed" if not allows_choice else "gst_slab_not_offered")
         raise ValidationFailed("A GST slab may be chosen on commercial and industrial "
@@ -498,20 +504,20 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                                  rate=rate, tax=tax, money=money, discounts=tiers,
                                  chosen_slab=own))
 
-    freight_tax: FreightTax | None = None
-    if freight is not None:
+    taxed: dict[str, FreightTax] = {}
+    for kind, spec in present.items():
         try:
-            freight_tax = compute_freight(
-                amount=freight.amount,
-                slab=(freight.gst_slab if freight.gst_slab is not None
-                      else default_freight_slab([p.slab for p in priced])),
-                chosen=freight.gst_slab is not None, intra_state=intra_state)
+            taxed[kind] = compute_charge(
+                kind, amount=spec.amount,
+                slab=(spec.gst_slab if spec.gst_slab is not None
+                      else default_charge_slab(kind, [p.slab for p in priced])),
+                chosen=spec.gst_slab is not None, intra_state=intra_state)
         except PricingError as exc:
             raise ValidationFailed(exc.message, code=exc.code,
-                                   fields={exc.field_path or "freight": exc.message}) from exc
+                                   fields={exc.field_path or kind: exc.message}) from exc
 
     try:
-        totals = document_totals(tuple(p.money for p in priced), freight_tax)
+        totals = document_totals(tuple(p.money for p in priced), *taxed.values())
     except PricingError as exc:
         raise ValidationFailed(exc.message, code=exc.code, fields={"lines": exc.message}) from exc
 
@@ -533,7 +539,9 @@ async def price_document(db: AsyncSession, *, partner_id: str | None,
                         f"cannot be added to a new one.")
 
     document = PricedDocument(lines=tuple(priced), totals=totals, intra_state=intra_state,
-                              warnings=tuple(warnings), freight=freight_tax)
+                              warnings=tuple(warnings), freight=taxed.get("freight"),
+                              extra_charges=tuple(taxed[k] for k in CHARGE_KINDS
+                                                  if k != "freight" and k in taxed))
     return PricedContext(document=document, as_of=day, seller_gstin_id=gstin_id,
                          seller_state_id=seller, seller_code=seller_code,
                          place_of_supply_state_id=pos_state, place_of_supply_code=pos_code,
@@ -570,6 +578,48 @@ async def gst_slabs(db: AsyncSession) -> sch.GstSlabChoices:
     return sch.GstSlabChoices(choices=[f"{v.normalize():f}" for v in await slab_choices(db)])
 
 
+_NAME = {"freight": "Freight", "installation": "Installation", "fittings": "Fittings"}
+
+
+def _code(kind: str, what: str) -> str:
+    """Freight keeps its FS-069 codes; the FS-088 charges share `charge_*`."""
+    return f"{'freight' if kind == 'freight' else 'charge'}_{what}"
+
+
+Charges = dict[str, "FreightSpec | None"]
+
+
+def request_charges(body: Any, row: Any = None) -> Charges:
+    """Each charge as a request gives it (FS-069 rule 9, FS-088): a field the body
+    sets wins, `null` removes; an unset field keeps what `row` holds, or none."""
+    if not hasattr(body, "model_fields_set"):
+        raise TypeError("request_charges takes a request model")
+    sent: set[str] = body.model_fields_set
+    return {k: (freight_spec(getattr(body, k)) if k in sent
+                else stored_charge(row, k) if row is not None else None)
+            for k in CHARGE_KINDS}
+
+
+def stored_charges(row: Any) -> Charges:
+    return {k: stored_charge(row, k) for k in CHARGE_KINDS}
+
+
+def stored_charge(row: Any, kind: str) -> FreightSpec | None:
+    """What a document holds, re-priced as it stands: a default slab re-resolves,
+    a chosen one is kept (FS-069 rule 7)."""
+    amount = getattr(row, f"{kind}_amount")
+    if amount is None:
+        return None
+    return FreightSpec(amount=_dec(amount),
+                       gst_slab=(_dec(getattr(row, f"{kind}_slab"))
+                                 if getattr(row, f"{kind}_slab_chosen") else None))
+
+
+def has_charge(row: Any) -> bool:
+    """FS-088 rule 15: any charge present, for the type-change ordering."""
+    return any(getattr(row, f"{k}_amount") is not None for k in CHARGE_KINDS)
+
+
 def freight_spec(body: Any) -> FreightSpec | None:
     """A request's `freight` (FS-069) as the pipeline takes it."""
     return (None if body is None
@@ -577,12 +627,7 @@ def freight_spec(body: Any) -> FreightSpec | None:
 
 
 def stored_freight(row: Any) -> FreightSpec | None:
-    """What a document holds, re-priced as it stands: a default slab re-resolves,
-    a chosen one is kept (rule 7)."""
-    if row.freight_amount is None:
-        return None
-    return FreightSpec(amount=_dec(row.freight_amount),
-                       gst_slab=_dec(row.freight_slab) if row.freight_slab_chosen else None)
+    return stored_charge(row, "freight")
 
 
 def line_spec(product_id: str, qty: Decimal, discounts: tuple[Decimal, ...],
@@ -605,52 +650,81 @@ async def quote_lines(db: AsyncSession, body: sch.QuoteLinesRequest) -> sch.Quot
         lines=[line_spec(ln.product_id, ln.qty, ln.discounts, ln.gst_slab, typed=True)
                for ln in body.lines],
         sales_type=body.sales_type, tax_treatment=body.tax_treatment,
-        freight=freight_spec(body.freight), offered=await slab_choices(db))
+        charges=request_charges(body), offered=await slab_choices(db))
     return _quote_response(ctx.document, as_of=ctx.as_of, gstin_id=ctx.seller_gstin_id,
                            seller_code=ctx.seller_code, pos_code=ctx.place_of_supply_code)
 
 
-_FREIGHT_COLS = ("fa", "fs", "fc", "fcg", "fsg", "fig", "ft")
+_SUFFIXES = ("amount", "slab", "slab_chosen", "cgst", "sgst", "igst", "total")
+# every charge column of a header, in KINDS order (077, 089)
+CHARGE_COLUMNS = tuple(f"{k}_{x}" for k in CHARGE_KINDS for x in _SUFFIXES)
+# FS-088 rule 16: every figures write sets all of them, present or null
+CHARGE_SET_SQL = ", ".join(f"{c} = :{c}" for c in CHARGE_COLUMNS)
 
 
-def freight_params(f: FreightTax | None) -> dict[str, Any]:
-    """The seven header columns (077), all null without freight."""
-    if f is None:
-        return dict.fromkeys(_FREIGHT_COLS)
-    m = f.money
-    return {"fa": f.amount, "fs": f.slab, "fc": f.chosen, "fcg": m.cgst, "fsg": m.sgst,
-            "fig": m.igst, "ft": m.total}
+def charge_params(doc: PricedDocument) -> dict[str, Any]:
+    """Every charge column for one write, null for a charge the document lacks."""
+    out: dict[str, Any] = {}
+    for kind in CHARGE_KINDS:
+        f = doc.charge(kind)
+        m = f.money if f is not None else None
+        values = ((f.amount, f.slab, f.chosen, m.cgst, m.sgst, m.igst, m.total)
+                  if f is not None and m is not None else (None,) * len(_SUFFIXES))
+        out.update({f"{kind}_{x}": v for x, v in zip(_SUFFIXES, values, strict=True)})
+    return out
 
 
 def freight_from_row(row: Any) -> sch.FreightOut | None:
-    """A stored document's freight. The rates are not stored: they follow from the
+    return charge_from_row(row, "freight")
+
+
+def charges_from_row(row: Any) -> dict[str, sch.FreightOut | None]:
+    """`freight=`, `installation=`, `fittings=` for a document's response."""
+    return {k: charge_from_row(row, k) for k in CHARGE_KINDS}
+
+
+def charge_from_row(row: Any, kind: str) -> sch.FreightOut | None:
+    """A stored document's charge. The rates are not stored: they follow from the
     slab and the document's `intra_state`, as a line's do."""
-    if row.freight_amount is None:
+    if getattr(row, f"{kind}_amount") is None:
         return None
-    slab = _dec(row.freight_slab)
+    def col(x: str) -> Any:
+        return getattr(row, f"{kind}_{x}")
+    slab = _dec(col("slab"))
     half = slab / 2
     intra = bool(row.intra_state)
     return sch.FreightOut(
-        amount=_s(_dec(row.freight_amount)), gst_slab=_rate(slab),
-        gst_slab_chosen=bool(row.freight_slab_chosen),
+        amount=_s(_dec(col("amount"))), gst_slab=_rate(slab),
+        gst_slab_chosen=bool(col("slab_chosen")),
         cgst_rate=_rate(half if intra else ZERO), sgst_rate=_rate(half if intra else ZERO),
-        igst_rate=_rate(ZERO if intra else slab), cgst=_s(_dec(row.freight_cgst)),
-        sgst=_s(_dec(row.freight_sgst)), igst=_s(_dec(row.freight_igst)),
-        total=_s(_dec(row.freight_total)))
+        igst_rate=_rate(ZERO if intra else slab), cgst=_s(_dec(col("cgst"))),
+        sgst=_s(_dec(col("sgst"))), igst=_s(_dec(col("igst"))),
+        total=_s(_dec(col("total"))))
 
 
 def freight_drift(row: Any, f: FreightTax | None) -> str | None:
-    """What moved between a stored document's freight and a fresh pricing of it
+    return charge_drift(row, "freight", f)
+
+
+def charges_drift(row: Any, doc: PricedDocument) -> dict[str, str]:
+    """`rate_changed` field texts for every charge that moved (FS-088 rule 9)."""
+    return {k: d for k in CHARGE_KINDS if (d := charge_drift(row, k, doc.charge(k)))}
+
+
+def charge_drift(row: Any, kind: str, f: FreightTax | None) -> str | None:
+    """What moved between a stored document's charge and a fresh pricing of it
     (FS-069 rule 9), as the `rate_changed` field text; None when nothing did."""
-    if row.freight_amount is None and f is None:
+    def col(x: str) -> Any:
+        return getattr(row, f"{kind}_{x}")
+    if col("amount") is None and f is None:
         return None
-    if row.freight_amount is None or f is None:
-        return "added" if row.freight_amount is None else "removed"
-    pairs = {"gst_slab": (_dec(row.freight_slab), f.slab),
-             "cgst": (_dec(row.freight_cgst), f.money.cgst),
-             "sgst": (_dec(row.freight_sgst), f.money.sgst),
-             "igst": (_dec(row.freight_igst), f.money.igst),
-             "total": (_dec(row.freight_total), f.money.total)}
+    if col("amount") is None or f is None:
+        return "added" if col("amount") is None else "removed"
+    pairs = {"gst_slab": (_dec(col("slab")), f.slab),
+             "cgst": (_dec(col("cgst")), f.money.cgst),
+             "sgst": (_dec(col("sgst")), f.money.sgst),
+             "igst": (_dec(col("igst")), f.money.igst),
+             "total": (_dec(col("total")), f.money.total)}
     moved = [f"{k} {_s(a) if k != 'gst_slab' else _rate(a)} -> "
              f"{_s(b) if k != 'gst_slab' else _rate(b)}"
              for k, (a, b) in pairs.items() if a != b]
@@ -658,8 +732,9 @@ def freight_drift(row: Any, f: FreightTax | None) -> str | None:
 
 
 def cleared_warning(lines: int, freight: bool) -> str:
+    """`freight` is true when any charge was cleared (FS-088 rule 15)."""
     what = [f"{lines} GST choices"] if lines else []
-    what += ["the freight"] if freight else []
+    what += ["the charges"] if freight else []
     return (f"gst_choice_cleared: {' and '.join(what)} removed; this document type takes "
             f"neither.")
 
@@ -712,7 +787,12 @@ def _quote_response(doc: PricedDocument, *, as_of: dt.date, gstin_id: str, selle
         place_of_supply_state=pos_code, intra_state=doc.intra_state,
         price_list_ids=sorted({p.rate.price_list.id for p in doc.lines}),
         lines=lines, freight=freight_out(doc.freight),
-        totals=sch.QuoteTotals(gross=_s(t.gross), discount=_s(t.discount), taxable=_s(t.taxable),
+        installation=freight_out(doc.charge("installation")),
+        fittings=freight_out(doc.charge("fittings")),
+        totals=sch.QuoteTotals(gross=_s(t.gross), discount=_s(t.discount),
+                               **{k: _s(c.amount if (c := doc.charge(k)) else ZERO)
+                                  for k in CHARGE_KINDS},
+                               taxable=_s(t.taxable),
                                cgst=_s(t.cgst), sgst=_s(t.sgst), igst=_s(t.igst),
                                total=_s(t.total)),
         warnings=list(doc.warnings))

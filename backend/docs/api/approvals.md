@@ -499,6 +499,8 @@ One approval chain.
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
@@ -763,6 +765,8 @@ One approval chain.
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
@@ -994,6 +998,8 @@ One approval chain.
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
 | `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax; 0.00 without. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax; 0.00 without. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

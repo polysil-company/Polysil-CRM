@@ -272,6 +272,11 @@ async def quote_lines(body: QuoteLinesRequest, db: DbSession) -> Envelope[QuoteL
     `totals.total` include it, while `totals.gross` and `totals.discount` are the
     goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
     `freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`.
+
+    **Installation and fittings (FS-088)** work as `freight` does, each optional.
+    Installation's default slab is 18 %; fittings take the highest goods slab. Errors
+    name the charge's field: `charge_not_allowed`, `charge_without_lines`,
+    `charge_amount_invalid`.
     """
     return Envelope(data=await service.quote_lines(db, body))
 

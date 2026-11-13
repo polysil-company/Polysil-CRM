@@ -117,6 +117,8 @@ The draft has no number until it is submitted.
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 | `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
 | `freight` | FreightIn \| null |  | FS-069: one freight charge before tax, commercial and industrial only. From quotations, omit it to take their freight summed; send it to replace that. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. From quotations, omit it to take theirs summed; send it to replace that. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. From quotations, omit it to take theirs summed; send it to replace that. |
 
 **Responses**
 
@@ -294,6 +296,8 @@ On an order from quotations the fields they fix are fixed.
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **Responses**
@@ -522,6 +526,8 @@ Replace a draft's lines wholesale, priced as new lines.
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. Re-send gst_slab on every line whose gst_slab_chosen is true. |
 | `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. |
+| `installation` | FreightIn \| null |  | FS-088: omit to keep, null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: omit to keep, null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **Responses**
@@ -910,6 +916,8 @@ and only the outcome to a dealer.
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
@@ -976,6 +984,8 @@ and only the outcome to a dealer.
 | `lines` | QuotationLineIn[] |  | A direct order's lines, as on a quotation. |
 | `subsidy` | SubsidyBlockIn \| null |  | Required on a subsidised order (FS-054), refused on any other. Its lead_ids replace lead_id, which is refused here. |
 | `freight` | FreightIn \| null |  | FS-069: one freight charge before tax, commercial and industrial only. From quotations, omit it to take their freight summed; send it to replace that. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. From quotations, omit it to take theirs summed; send it to replace that. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. From quotations, omit it to take theirs summed; send it to replace that. |
 
 **`OrderLeadRef`**
 
@@ -1030,6 +1040,8 @@ and only the outcome to a dealer.
 |---|---|---|---|
 | `lines` | QuotationLineIn[] | yes | Every line; the draft's lines are replaced. Re-send gst_slab on every line whose gst_slab_chosen is true. |
 | `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. |
+| `installation` | FreightIn \| null |  | FS-088: omit to keep, null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: omit to keep, null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **`OrderPage`**
@@ -1064,6 +1076,8 @@ and only the outcome to a dealer.
 | `warehouse_id` | string \| null |  | "Order to" (FS-023): staff only. Null means the default warehouse. |
 | `remarks` | string \| null |  |  |
 | `freight` | FreightIn \| null |  | FS-069: omit to keep, null to remove. A change to a type other than commercial or industrial clears the freight and every GST choice (warning gst_choice_cleared); sending freight with such a change is 422 freight_not_allowed. |
+| `installation` | FreightIn \| null |  | FS-088: installation charges before tax, commercial and industrial only. GST defaults to 18 %. Omit to keep; null to remove. |
+| `fittings` | FreightIn \| null |  | FS-088: fittings material charges before tax, commercial and industrial only. GST defaults to the highest goods slab. Omit to keep; null to remove. |
 | `expected_status` | `draft` \| `submitted` \| `approved` \| `partially_dispatched` \| `dispatched` \| `closed_short` \| `cancelled` \| null |  | The status the screen showed; a different one is 409 status_changed. |
 
 **`OrderPayments`**
@@ -1287,6 +1301,8 @@ and only the outcome to a dealer.
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
 | `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax; 0.00 without. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax; 0.00 without. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

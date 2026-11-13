@@ -42,8 +42,9 @@ def render_html(doc: dict[str, Any]) -> str:
     tiers = discount_tiers(doc["lines"])
     return _env.get_template("order.html").render(
         o=o, lines=doc["lines"], tiers=tiers, discount_cols=discount_columns(tiers),
-        # FS-069 rule 16: freight is a row of its own, so the rows add up to the total
-        freight=quotation_domain.freight_rates(o),
+        # FS-069 rule 16, FS-088 rule 11: each charge is a row of its own, so the rows
+        # add up to the total
+        charges=quotation_domain.charge_rows(o),
         is_provisional=bool(o.get("is_provisional")),
         intra_state=bool(o.get("intra_state")), rendered_on=today_ist().strftime("%d %b %Y"))
 

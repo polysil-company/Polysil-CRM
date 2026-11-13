@@ -410,6 +410,11 @@ It returns priced under `freight`, and `totals.taxable`, the taxes and
 goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
 `freight_not_allowed`, `freight_without_lines`, `freight_amount_invalid`.
 
+**Installation and fittings (FS-088)** work as `freight` does, each optional.
+Installation's default slab is 18 %; fittings take the highest goods slab. Errors
+name the charge's field: `charge_not_allowed`, `charge_without_lines`,
+`charge_amount_invalid`.
+
 **Request body**
 
 **`QuoteLinesRequest`**
@@ -424,6 +429,8 @@ goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 | `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). A GST choice and freight need commercial or industrial. |
 | `freight` | FreightIn \| null |  | FS-069: optional freight. |
+| `installation` | FreightIn \| null |  | FS-088: optional installation charges. |
+| `fittings` | FreightIn \| null |  | FS-088: optional fittings material charges. |
 
 **Responses**
 
@@ -665,6 +672,8 @@ goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
 | `tax_treatment` | `domestic` \| `export_lut` \| `export_igst` |  | An export document's stored treatment, so the preview shows the tax it will store: export_lut prices every line at 0 % IGST, export_igst at its slab, and neither is ever intra-state. Default `domestic`. |
 | `sales_type` | `commercial` \| `industrial` \| `subsidised` \| `export` \| `sample` \| `marketing` \| `marketing_material` \| `replacement` \| null |  | The quotation's sale type or the order's type, so the preview prices from the same lists the save will. commercial, industrial and subsidised use their own lists first; every other value, and null, use general lists only (FS-061). A GST choice and freight need commercial or industrial. |
 | `freight` | FreightIn \| null |  | FS-069: optional freight. |
+| `installation` | FreightIn \| null |  | FS-088: optional installation charges. |
+| `fittings` | FreightIn \| null |  | FS-088: optional fittings material charges. |
 
 **`QuoteLinesResponse`**
 
@@ -678,6 +687,8 @@ goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
 | `price_list_ids` | string[] | yes | Every list the lines resolved from. More than one raises the `mixed_price_lists` warning. |
 | `lines` | QuoteLine[] | yes |  |
 | `freight` | FreightOut \| null |  |  |
+| `installation` | FreightOut \| null |  |  |
+| `fittings` | FreightOut \| null |  |  |
 | `totals` | QuoteTotals | yes |  |
 | `warnings` | string[] | yes | Each is `code: sentence`. Split on the first colon, switch on the code, show the sentence. |
 
@@ -687,6 +698,9 @@ goods only. Errors: 422 `gst_choice_not_allowed`, `gst_slab_not_offered`,
 |---|---|---|---|
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
+| `freight` | string |  | FS-069: the freight before tax. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |
