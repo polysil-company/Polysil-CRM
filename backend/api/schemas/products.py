@@ -309,6 +309,12 @@ def _slab_places(v: Decimal | None) -> Decimal | None:
     return None if v is None else _places(v, 3, "gst_slab")
 
 
+INSTALLATION_IN = ("FS-088: installation charges before tax, commercial and industrial "
+                   "only. GST defaults to 18 %. ")
+FITTINGS_IN = ("FS-088: fittings material charges before tax, commercial and industrial "
+               "only. GST defaults to the highest goods slab. ")
+
+
 class FreightIn(BaseModel):
     """FS-069: one freight or transport charge per document, before tax."""
 
@@ -443,6 +449,10 @@ class QuoteLinesRequest(BaseModel):
                     "lists only (FS-061). A GST choice and freight need commercial or "
                     "industrial.")
     freight: FreightIn | None = Field(default=None, description="FS-069: optional freight.")
+    installation: FreightIn | None = Field(default=None, description="FS-088: optional "
+                                                                     "installation charges.")
+    fittings: FreightIn | None = Field(default=None, description="FS-088: optional fittings "
+                                                                 "material charges.")
 
 
 class QuoteLine(BaseModel):
@@ -493,10 +503,16 @@ class QuoteTotals(BaseModel):
     """The sum of the rounded lines, never a recomputation on the summed values.
     The two differ by paise, and a hundred-line document by rupees. `gross` and
     `discount` are the goods only; `taxable`, the taxes and `total` include freight,
-    so `taxable = gross - discount + freight.amount` (FS-069)."""
+    so `taxable = gross - discount + freight.amount` (FS-069), and each FS-088 charge
+    joins the same way."""
 
     gross: str
     discount: str
+    freight: str = Field(default="0.00", description="FS-069: the freight before tax.")
+    installation: str = Field(default="0.00", description="FS-088: installation charges "
+                                                          "before tax.")
+    fittings: str = Field(default="0.00", description="FS-088: fittings material charges "
+                                                      "before tax.")
     taxable: str
     cgst: str
     sgst: str
@@ -517,6 +533,8 @@ class QuoteLinesResponse(BaseModel):
                     "`mixed_price_lists` warning.")
     lines: list[QuoteLine]
     freight: FreightOut | None = None
+    installation: FreightOut | None = None
+    fittings: FreightOut | None = None
     totals: QuoteTotals
     warnings: list[str] = Field(
         description="Each is `code: sentence`. Split on the first colon, switch on the "

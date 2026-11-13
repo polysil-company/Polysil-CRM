@@ -60,7 +60,7 @@ from api.schemas.leads import (
 from api.services import approval_view, people, pricing, quotation_subsidy
 from api.services.clock import IST, today_ist
 from api.services.leads import _capped_total, _decode_cursor, _encode_cursor
-from api.services.pricing import FreightSpec, LineSpec, PricedContext, _rate, _s
+from api.services.pricing import Charges, LineSpec, PricedContext, _rate, _s
 from api.storage import Storage
 
 _QUOTATIONS = SPECS["quotations"]
@@ -92,7 +92,7 @@ quotation_t = sa.table(
 # seller block is the master while draft and the row's own snapshot once sent, by
 # status and not by COALESCE: a sent row's null address is null, not the master's
 # current one (rule 3; code review F-5).
-_Q_SELECT = """
+_Q_SELECT = f"""
 SELECT q.id, q.quote_no, q.version, q.status, q.sales_type, q.source,
        q.lead_id, l.inquiry_no AS lead_inquiry_no, l.stage AS lead_stage,
        q.party_name, q.party_mobile, q.party_address, q.party_gstin,
@@ -111,8 +111,7 @@ SELECT q.id, q.quote_no, q.version, q.status, q.sales_type, q.source,
        q.intra_state, q.price_effective_date, q.tax_treatment, q.export_country, q.lut_arn,
        q.price_list_id, pl.name AS price_list_name,
        q.gross, q.discount, q.taxable, q.cgst, q.sgst, q.igst, q.total,
-       q.freight_amount, q.freight_slab, q.freight_slab_chosen, q.freight_cgst,
-       q.freight_sgst, q.freight_igst, q.freight_total,
+       {", ".join("q." + c for c in pricing.CHARGE_COLUMNS)},
        q.is_provisional, q.terms, q.valid_until, q.sent_at, q.viewed_at, q.open_count,
        q.accepted_at, q.rejected_at, q.decided_by, dbu.full_name AS decided_by_name,
        q.decision_remark,
@@ -229,9 +228,9 @@ async def _lock_quotation(db: AsyncSession, quotation_id: str) -> Any:
         "sales_type, supersedes_id, superseded_by_id, valid_until, partner_id, "
         "place_of_supply_territory_id, seller_gstin_id, price_effective_date, party_name, "
         "party_mobile, party_address, party_gstin, terms, deleted_at, pdf_state, pdf_key, "
-        "tax_treatment, export_country, territory_id, freight_amount, freight_slab, "
-        "freight_slab_chosen, freight_cgst, freight_sgst, freight_igst, freight_total "
-        "FROM quotation WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL FOR UPDATE"),
+        "tax_treatment, export_country, territory_id, "
+        + ", ".join(pricing.CHARGE_COLUMNS)
+        + " FROM quotation WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL FOR UPDATE"),
         {"id": quotation_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such quotation.")
@@ -324,16 +323,16 @@ async def _lead_defaults(db: AsyncSession, lead_id: str) -> Any:
 async def _price(db: AsyncSession, *, partner_id: str | None, pos_territory_id: str,
                  seller_gstin_id: str | None, as_of: dt.date | None,
                  specs: list[LineSpec], existing: bool, sales_type: str,
-                 treatment: str = "domestic", freight: FreightSpec | None,
+                 treatment: str = "domestic", charges: Charges,
                  offered: Sequence[Decimal] | None = None) -> PricedContext:
-    """`freight` has no default: every caller passes what the document holds or what
-    the request says (FS-069 rule 9, plan review B-2). `offered` is the admin's
-    list, passed on input only (rule 3)."""
+    """`charges` has no default: every caller passes what the document holds or what
+    the request says (FS-069 rule 9, plan review B-2; FS-088). `offered` is the
+    admin's list, passed on input only (rule 3)."""
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos_territory_id,
             seller_gstin_id=seller_gstin_id, as_of=as_of, lines=specs, existing=existing,
-            sales_type=sales_type, tax_treatment=treatment, freight=freight, offered=offered)
+            sales_type=sales_type, tax_treatment=treatment, charges=charges, offered=offered)
     except ValidationFailed as exc:
         # the pipeline speaks the preview's field name; a quotation's is
         # price_effective_date, and a screen attaches errors by field (PR #10 review)
@@ -380,9 +379,7 @@ def _compare_stored(stored: list[Any], ctx: PricedContext, head: Any) -> None:
         if moved:
             fields[f"lines[{i}].tax"] = ", ".join(
                 f"{f} {_s(getattr(row, f))} -> {_s(getattr(priced.money, f))}" for f in moved)
-    drift = pricing.freight_drift(head, ctx.document.freight)
-    if drift:
-        fields["freight"] = drift
+    fields.update(pricing.charges_drift(head, ctx.document))
     if fields:
         raise ConflictError("Prices or tax changed since this draft was saved. Review the new "
                             "figures and save again.", code="rate_changed", fields=fields)
@@ -450,9 +447,7 @@ async def _write_header_figures(db: AsyncSession, quotation_id: Any, ctx: Priced
             price_list_id = CAST(:pl AS uuid),
             gross = :gross, discount = :disc, taxable = :taxable,
             cgst = :cgst, sgst = :sgst, igst = :igst, total = :total,
-            is_provisional = :prov,
-            freight_amount = :fa, freight_slab = :fs, freight_slab_chosen = :fc,
-            freight_cgst = :fcg, freight_sgst = :fsg, freight_igst = :fig, freight_total = :ft
+            is_provisional = :prov, """ + pricing.CHARGE_SET_SQL + """
         WHERE id = CAST(:q AS uuid)"""),
         {"sg": ctx.seller_gstin_id, "ps": ctx.place_of_supply_state_id,
          "intra": ctx.intra_state, "day": ctx.as_of,
@@ -460,7 +455,7 @@ async def _write_header_figures(db: AsyncSession, quotation_id: Any, ctx: Priced
          "gross": t.gross, "disc": t.discount, "taxable": t.taxable, "cgst": t.cgst,
          "sgst": t.sgst, "igst": t.igst, "total": t.total,
          "prov": any(p.provisional_fields for p in ctx.document.lines), "q": quotation_id,
-         **pricing.freight_params(ctx.document.freight)})
+         **pricing.charge_params(ctx.document)})
 
 
 def _specs_from_rows(rows: list[Any], *, keep_choice: bool = True) -> list[LineSpec]:
@@ -504,9 +499,10 @@ def _people(row: Any, names: people.Names) -> tuple[PartnerRef | None, UserRef |
 
 
 def _totals(row: Any) -> sch.Totals:
-    # the header identity (077's CHECK) gives the freight without another column
-    freight = Decimal(row.taxable) - Decimal(row.gross) + Decimal(row.discount)
-    return sch.Totals(gross=_s(row.gross), discount=_s(row.discount), freight=_s(freight),
+    # FS-088 rule 13: each charge from its own column, never derived from the identity
+    return sch.Totals(gross=_s(row.gross), discount=_s(row.discount),
+                      **{k: _s(Decimal(getattr(row, f"{k}_amount") or 0))
+                         for k in pricing.CHARGE_KINDS},
                       taxable=_s(row.taxable), cgst=_s(row.cgst), sgst=_s(row.sgst),
                       igst=_s(row.igst), total=_s(row.total))
 
@@ -592,7 +588,9 @@ def _to_quotation(row: Any, line_rows: list[Any], settings: Settings,
                     if row.price_list_id and row.price_list_name else None),
         price_list_ids=sorted({ln.price_list_id for ln in lines}),
         lines=lines, totals=_totals(row), is_provisional=row.is_provisional,
-        freight=pricing.freight_from_row(row),
+        freight=pricing.charge_from_row(row, "freight"),
+        installation=pricing.charge_from_row(row, "installation"),
+        fittings=pricing.charge_from_row(row, "fittings"),
         gst_changed_lines=sum(1 for ln in lines if ln.gst_slab_chosen),
         warnings=_warnings(row, lines), terms=row.terms,
         valid_until=_iso(row.valid_until), sent_at=_iso(row.sent_at),
@@ -890,7 +888,7 @@ async def create_quotation(db: AsyncSession, caller: Caller, body: sch.Quotation
                        seller_gstin_id=body.seller_gstin_id, as_of=body.price_effective_date,
                        specs=_specs_from_body(body.lines), existing=False,
                        sales_type=sales_type, treatment=treatment,
-                       freight=pricing.freight_spec(body.freight),
+                       charges=pricing.request_charges(body),
                        offered=await pricing.slab_choices(db))
     _compare(body.lines, ctx)
     arn = await _lut(db, treatment, ctx)
@@ -1002,20 +1000,24 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     stored = await _stored_lines(db, row.id)
     # FS-069 rule 2: a type that takes no choice and no freight clears both
     keeps = sales_type in pricing.CHOICE_TYPES and treatment == "domestic"
-    if "freight" in body.model_fields_set and body.freight is not None and not keeps:
-        raise ValidationFailed("Freight is for commercial and industrial quotations only.",
-                               code="freight_not_allowed", fields={"freight": "Not allowed."})
-    freight = (pricing.freight_spec(body.freight) if "freight" in body.model_fields_set
-               else pricing.stored_freight(row))
+    sent = [k for k in pricing.CHARGE_KINDS
+            if k in body.model_fields_set and getattr(body, k) is not None]
+    if sent and not keeps:
+        refused = sent[0]
+        raise ValidationFailed(f"{refused.title()} is for commercial and industrial quotations "
+                               "only.", code="freight_not_allowed" if refused == "freight"
+                               else "charge_not_allowed", fields={refused: "Not allowed."})
+    charges = pricing.request_charges(body, row)
     cleared_lines = sum(1 for r in stored if r.gst_slab_chosen) if not keeps else 0
-    cleared_freight = row.freight_amount is not None and not keeps
+    # FS-088 rule 15: any charge, not freight alone
+    cleared_freight = pricing.has_charge(row) and not keeps
     ctx = await _price(db, partner_id=partner_id, pos_territory_id=pos_territory,
                        seller_gstin_id=seller, as_of=day,
                        specs=_specs_from_rows(stored, keep_choice=keeps),
                        existing=True, sales_type=sales_type, treatment=treatment,
-                       freight=freight if keeps else None,
+                       charges=charges if keeps else {},
                        offered=(await pricing.slab_choices(db)
-                                if "freight" in body.model_fields_set else None))
+                                if set(pricing.CHARGE_KINDS) & body.model_fields_set else None))
     arn = await _lut(db, treatment, ctx)
     # 077 checks freight against the type on every statement: going to a type that
     # takes none, the figures (freight cleared) are written before the type moves;
@@ -1046,7 +1048,9 @@ async def patch_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     if keeps:
         await _write_header_figures(db, row.id, ctx)
     await _cancel_approval(db, quotation_id)
-    extra = ({"cleared": {"lines": cleared_lines, "freight": cleared_freight}}
+    extra = ({"cleared": {"lines": cleared_lines,
+                          **{k: getattr(row, f"{k}_amount") is not None
+                             for k in pricing.CHARGE_KINDS}}}
              if cleared_lines or cleared_freight else {})
     await _emit(db, quotation_id=row.id, lead_id=row.lead_id, kind="quotation.updated",
                 actor_id=caller.user_id, actor_name=await _actor_name(db),
@@ -1103,9 +1107,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_body(body.lines), existing=False,
                        sales_type=row.sales_type, treatment=row.tax_treatment,
-                       freight=(pricing.freight_spec(body.freight)
-                                if "freight" in body.model_fields_set
-                                else pricing.stored_freight(row)),
+                       charges=pricing.request_charges(body, row),
                        offered=await pricing.slab_choices(db))
     _compare(body.lines, ctx)
     await _write_lines(db, row.id, ctx)
@@ -1170,7 +1172,7 @@ async def send_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(row.seller_gstin_id), as_of=row.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True,
                        sales_type=row.sales_type, treatment=row.tax_treatment,
-                       freight=pricing.stored_freight(row))
+                       charges=pricing.stored_charges(row))
     _compare_stored(stored, ctx, row)
     gate: str = (await db.execute(text("SELECT quotation_send_gate(CAST(:q AS uuid))"),
                              {"q": quotation_id})).scalar_one()
@@ -1362,7 +1364,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
                        seller_gstin_id=str(src.seller_gstin_id), as_of=body.price_effective_date,
                        specs=_specs_from_rows(stored), existing=True,
                        sales_type=src.sales_type, treatment=src.tax_treatment,
-                       freight=pricing.stored_freight(src))
+                       charges=pricing.stored_charges(src))
     # rule 5: the treatment as it was; the ARN looked up again at the new price date
     arn = await _lut(db, src.tax_treatment, ctx)
     try:
@@ -1398,7 +1400,7 @@ async def revise_quotation(db: AsyncSession, caller: Caller, quotation_id: str,
     # FS-069: the slab charged, so a chosen line is not counted as repriced
     repriced = sum(1 for r, p in zip(stored, ctx.document.lines, strict=True)
                    if Decimal(r.rate) != p.rate.rate or Decimal(r.gst_slab) != p.slab)
-    repriced += 1 if pricing.freight_drift(src, ctx.document.freight) else 0
+    repriced += len(pricing.charges_drift(src, ctx.document))
     actor = await _actor_name(db)
     await _emit(db, quotation_id=new_id, lead_id=lead_id, kind="quotation.revised",
                 actor_id=caller.user_id, actor_name=actor, supersedes=str(src.id),
@@ -1456,8 +1458,7 @@ def _public(doc: dict[str, Any], token: str) -> sch.PublicQuotation:
         totals=sch.Totals(
             **{k: _s(Decimal(str(t[k]))) for k in
                ("gross", "discount", "taxable", "cgst", "sgst", "igst", "total")},
-            freight=_s(Decimal(str(t["taxable"])) - Decimal(str(t["gross"]))
-                       + Decimal(str(t["discount"])))),
+            **{k: _s(Decimal(str(t.get(k) or 0))) for k in pricing.CHARGE_KINDS}),
         line_count=int(doc["line_count"]), pdf_ready=doc.get("pdf_state") == "ready",
         pdf_url=f"/api/v1/public/q/{token}/pdf", subsidy=_public_subsidy(doc.get("subsidy")))
 

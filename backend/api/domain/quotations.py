@@ -16,6 +16,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
+from api.domain.pricing.tax import CHARGE_KINDS, CHARGE_LABELS
+
 # ── the lifecycle (FS-005 3) ─────────────────────────────────────────────────
 
 TRANSITIONS: dict[str, frozenset[str]] = {
@@ -208,11 +210,31 @@ def freight_rates(doc: Mapping[str, object]) -> dict[str, object] | None:
     return {"cgst_rate": Decimal(0), "sgst_rate": Decimal(0), "igst_rate": slab}
 
 
+def charge_rows(doc: Mapping[str, object]) -> list[dict[str, object]]:
+    """Every charge the document carries, in print order (FS-088 rule 11): its label,
+    its stored figures, and its rates, which are not stored. `doc` is the claim's
+    quotation or order."""
+    out: list[dict[str, object]] = []
+    for kind in CHARGE_KINDS:
+        if doc.get(f"{kind}_amount") is None:
+            continue
+        slab = _dec(doc[f"{kind}_slab"])
+        intra = bool(doc.get("intra_state"))
+        out.append({
+            "kind": kind, "label": CHARGE_LABELS[kind],
+            **{x: doc[f"{kind}_{x}"] for x in ("amount", "cgst", "sgst", "igst", "total")},
+            "cgst_rate": slab / 2 if intra else Decimal(0),
+            "sgst_rate": slab / 2 if intra else Decimal(0),
+            "igst_rate": Decimal(0) if intra else slab})
+    return out
+
+
 def goods_subtotal(doc: Mapping[str, object]) -> Decimal:
-    """The goods' taxable value: the document's taxable less its freight, which
-    `taxable` includes (FS-069 rule 8)."""
-    freight = doc.get("freight_amount")
-    return _dec(doc["taxable"]) - (_dec(freight) if freight is not None else Decimal(0))
+    """The goods' taxable value: the document's taxable less every charge, which
+    `taxable` includes (FS-069 rule 8, FS-088 rule 14)."""
+    charges = sum((_dec(a) for k in CHARGE_KINDS
+                   if (a := doc.get(f"{k}_amount")) is not None), Decimal(0))
+    return _dec(doc["taxable"]) - charges
 
 
 def validity_days(sent_on: dt.date, until: dt.date) -> int:

@@ -20,7 +20,15 @@ from api.schemas.approvals import Decision
 from api.schemas.complaints import Complaint
 from api.schemas.leads import UUID_RE, OrgUnitRef, PageMeta, PartnerRef, TerritoryRef, UserRef
 from api.schemas.payments import OrderPayments
-from api.schemas.products import MAX_LINES, FreightIn, FreightOut, TaxTreatment, _places
+from api.schemas.products import (
+    FITTINGS_IN,
+    INSTALLATION_IN,
+    MAX_LINES,
+    FreightIn,
+    FreightOut,
+    TaxTreatment,
+    _places,
+)
 from api.schemas.quotations import Quotation, QuotationLineIn, Totals
 from api.schemas.schemes import OrderBenefit
 from api.schemas.stock import LineStock, WarehouseRef
@@ -133,6 +141,12 @@ class OrderCreate(BaseModel):
         default=None, description="FS-069: one freight charge before tax, commercial and "
                                   "industrial only. From quotations, omit it to take their "
                                   "freight summed; send it to replace that.")
+    installation: FreightIn | None = Field(
+        default=None, description=INSTALLATION_IN + "From quotations, omit it to take "
+                                  "theirs summed; send it to replace that.")
+    fittings: FreightIn | None = Field(
+        default=None, description=FITTINGS_IN + "From quotations, omit it to take "
+                                  "theirs summed; send it to replace that.")
 
     @property
     def partner_given(self) -> bool:
@@ -171,6 +185,10 @@ class OrderPatch(BaseModel):
                                   "other than commercial or industrial clears the freight and "
                                   "every GST choice (warning gst_choice_cleared); sending "
                                   "freight with such a change is 422 freight_not_allowed.")
+    installation: FreightIn | None = Field(
+        default=None, description=INSTALLATION_IN + "Omit to keep; null to remove.")
+    fittings: FreightIn | None = Field(
+        default=None, description=FITTINGS_IN + "Omit to keep; null to remove.")
     expected_status: OrderStatus | None = Field(default=None, description=_EXPECTED)
 
     @property
@@ -187,6 +205,10 @@ class OrderLinesReplace(BaseModel):
                                           "gst_slab_chosen is true.")]
     freight: FreightIn | None = Field(default=None,
                                       description="FS-069: omit to keep, null to remove.")
+    installation: FreightIn | None = Field(default=None,
+                                           description="FS-088: omit to keep, null to remove.")
+    fittings: FreightIn | None = Field(default=None,
+                                       description="FS-088: omit to keep, null to remove.")
     expected_status: OrderStatus | None = Field(default=None, description=_EXPECTED)
 
 
@@ -252,12 +274,16 @@ class DispatchCreate(BaseModel):
 class ThresholdPut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    doc_type: Literal["sales_order", "quotation", "complaint"] = "sales_order"
+    doc_type: Literal["sales_order", "quotation", "complaint", "industrial_order"] = Field(
+        default="sales_order",
+        description="`industrial_order` (FS-089): the ladder an industrial order climbs.")
     role: Literal["field_officer", "district_manager", "state_manager", "regional_manager",
-                  "admin_sales"] = Field(
+                  "admin_sales", "md_ceo"] = Field(
         description="An order's rows are for the three managers, and so are a refund's "
                     "(`complaint`, rupees). A quotation's are for any of the five: the field "
-                    "officer's is the officer's own limit.")
+                    "officer's is the officer's own limit. An industrial order's are for the "
+                    "State Manager, the Regional Manager and the MD (`md_ceo`); only the MD "
+                    "may have no limit.")
     territory_id: Annotated[str | None, Field(
         default=None, pattern=UUID_RE, description="Null for the company-wide row.")]
     max_amount: Annotated[Decimal | None, Field(
@@ -441,6 +467,10 @@ class Order(BaseModel):
     is_provisional: bool = Field(description="A line uses stand-in prices or tax data.")
     lines: list[OrderLine]
     freight: FreightOut | None = Field(default=None, description="FS-069: the freight, or null.")
+    installation: FreightOut | None = Field(default=None, description="FS-088: installation "
+                                                                      "charges, or null.")
+    fittings: FreightOut | None = Field(default=None, description="FS-088: fittings material "
+                                                                  "charges, or null.")
     gst_changed_lines: int = Field(default=0, description="FS-069: lines whose GST slab was "
                                                           "picked. Show it to an approver.")
     totals: Totals

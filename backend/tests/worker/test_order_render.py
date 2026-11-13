@@ -140,9 +140,29 @@ def test_freight_is_a_row_of_its_own_so_the_rows_add_up() -> None:
              freight_cgst="45.00", freight_sgst="45.00", freight_igst="0.00",
              freight_total="590.00")
     page = _text(job.render_html(doc))
-    assert "Freight" in page
+    assert "Transportation" in page
     assert "₹500.00 45.00 (9%) 45.00 (9%) ₹590.00" in page
 
 
 def test_no_freight_row_without_freight() -> None:
-    assert "Freight" not in _text(job.render_html(_doc()))
+    assert "Transportation" not in _text(job.render_html(_doc()))
+
+
+def test_every_charge_is_a_row_of_its_own() -> None:
+    """FS-088 rule 11: installation and fittings print as freight does, after it."""
+    doc = _doc()
+    o = doc["order"]
+    o.update(freight_amount="500.00", freight_slab="18", freight_slab_chosen=False,
+             freight_cgst="45.00", freight_sgst="45.00", freight_igst="0.00",
+             freight_total="590.00",
+             installation_amount="1000.00", installation_slab="18",
+             installation_slab_chosen=False, installation_cgst="90.00",
+             installation_sgst="90.00", installation_igst="0.00", installation_total="1180.00",
+             fittings_amount="200.00", fittings_slab="5", fittings_slab_chosen=False,
+             fittings_cgst="5.00", fittings_sgst="5.00", fittings_igst="0.00",
+             fittings_total="210.00")
+    page = _text(job.render_html(doc))
+    assert page.index("Transportation") < page.index("Installation Charges") \
+        < page.index("Fittings Material Charges")
+    assert "₹1,000.00 90.00 (9%) 90.00 (9%) ₹1,180.00" in page
+    assert "₹200.00 5.00 (2.5%) 5.00 (2.5%) ₹210.00" in page

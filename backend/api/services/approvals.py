@@ -196,6 +196,10 @@ async def thresholds(db: AsyncSession) -> list[sch.Threshold]:
 _LEVEL = {"district_manager": 2, "state_manager": 3, "regional_manager": 4}
 # FS-013: a quotation's ladder, with the officer's own limit at the bottom
 _QUOTATION_LEVEL = {"field_officer": 1, **_LEVEL, "admin_sales": 5}
+# FS-089: an industrial order's ladder, the MD at the top
+_INDUSTRIAL_LEVEL = {"state_manager": 3, "regional_manager": 4, "md_ceo": 5}
+_LADDERS = {"sales_order": _LEVEL, "complaint": _LEVEL, "quotation": _QUOTATION_LEVEL,
+            "industrial_order": _INDUSTRIAL_LEVEL}
 
 
 async def put_threshold(db: AsyncSession, caller: Caller, body: sch.ThresholdPut
@@ -208,7 +212,7 @@ async def put_threshold(db: AsyncSession, caller: Caller, body: sch.ThresholdPut
         "AND t.territory_id IS NOT DISTINCT FROM CAST(:t AS uuid) AND t.deleted_at IS NULL"),
         {"d": body.doc_type, "t": body.territory_id})).all()}
     group[body.role] = body.max_amount
-    levels = _QUOTATION_LEVEL if body.doc_type == "quotation" else _LEVEL
+    levels = _LADDERS[body.doc_type]
     if body.role not in levels:
         raise ValidationFailed(fields={"role": f"no {body.doc_type} limit for this role"})
     if body.doc_type == "quotation" and body.max_amount is not None and body.max_amount > 100:
@@ -221,7 +225,10 @@ async def put_threshold(db: AsyncSession, caller: Caller, body: sch.ThresholdPut
     if body.doc_type != "quotation" and body.max_amount is None:
         # release review B M-3: an unlimited lower manager ends every chain there, so the
         # managers above never see a large order; only the top role may be unlimited
-        top = max(levels[r] for r in group if r in levels)
+        # FS-089 rule 8: an industrial ladder's top is fixed, so the first row of a
+        # territory cannot leave the State Manager uncapped
+        top = (max(levels.values()) if body.doc_type == "industrial_order"
+               else max(levels[r] for r in group if r in levels))
         if levels[body.role] < top:
             raise ValidationFailed(fields={"max_amount": "only the highest role may have no limit"})
     if body.territory_id is not None and (await db.execute(text(

@@ -611,7 +611,7 @@ def _with_freight(slab: str) -> dict:
 
 def test_freight_prints_below_a_goods_sub_total() -> None:
     flat = _flat(_with_freight("18"))
-    assert "Sub Total ₹1,768.10 Freight ₹500.00" in flat
+    assert "Sub Total ₹1,768.10 Transportation ₹500.00" in flat
     assert "Total ₹2,446.50" in flat
 
 
@@ -626,4 +626,21 @@ def test_the_rate_label_stays_when_freight_shares_the_lines_slab() -> None:
 
 
 def test_no_freight_row_without_freight() -> None:
-    assert "Freight" not in _flat(_doc())
+    assert "Transportation" not in _flat(_doc())
+
+
+def test_installation_prints_below_the_sub_total_and_drops_the_rate_label() -> None:
+    """FS-088 rules 11 and 14: the Sub Total takes out every charge, and a charge at
+    18 % beside 5 % goods names no single rate."""
+    doc = _doc()
+    q = doc["quotation"]
+    q.update(installation_amount="1000.00", installation_slab="18",
+             installation_slab_chosen=False, installation_cgst="90.00",
+             installation_sgst="90.00", installation_igst="0.00", installation_total="1180.00",
+             taxable=str(Decimal(q["taxable"]) + Decimal("1000.00")),
+             cgst=str(Decimal(q["cgst"]) + Decimal("90.00")),
+             sgst=str(Decimal(q["sgst"]) + Decimal("90.00")),
+             total=str(Decimal(q["total"]) + Decimal("1180.00")))
+    flat = _flat(doc)
+    assert "Sub Total ₹1,768.10 Installation Charges ₹1,000.00" in flat
+    assert "CGST @" not in flat

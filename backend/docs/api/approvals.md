@@ -143,8 +143,8 @@ submitted from now on.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | `sales_order` \| `quotation` \| `complaint` |  | Default `sales_order`. |
-| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. |
+| `doc_type` | `sales_order` \| `quotation` \| `complaint` \| `industrial_order` |  | `industrial_order` (FS-089): the ladder an industrial order climbs. Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` \| `md_ceo` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. An industrial order's are for the State Manager, the Regional Manager and the MD (`md_ceo`); only the MD may have no limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
 | `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
@@ -499,6 +499,8 @@ One approval chain.
 | `is_provisional` | boolean | yes | A line uses stand-in prices or tax data. |
 | `lines` | OrderLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `approval` | Approval \| null | yes | The latest request. Null on a draft never submitted. |
@@ -763,6 +765,8 @@ One approval chain.
 | `price_list_ids` | string[] | yes |  |
 | `lines` | QuotationLine[] | yes |  |
 | `freight` | FreightOut \| null |  | FS-069: the freight, or null. |
+| `installation` | FreightOut \| null |  | FS-088: installation charges, or null. |
+| `fittings` | FreightOut \| null |  | FS-088: fittings material charges, or null. |
 | `gst_changed_lines` | integer |  | FS-069: lines whose GST slab was picked. Show it to an approver. Default `0`. |
 | `totals` | Totals | yes |  |
 | `is_provisional` | boolean | yes | Any line carries a stand-in rate or slab. The PDF carries a banner; show the same. |
@@ -982,8 +986,8 @@ One approval chain.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `doc_type` | `sales_order` \| `quotation` \| `complaint` |  | Default `sales_order`. |
-| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. |
+| `doc_type` | `sales_order` \| `quotation` \| `complaint` \| `industrial_order` |  | `industrial_order` (FS-089): the ladder an industrial order climbs. Default `sales_order`. |
+| `role` | `field_officer` \| `district_manager` \| `state_manager` \| `regional_manager` \| `admin_sales` \| `md_ceo` | yes | An order's rows are for the three managers, and so are a refund's (`complaint`, rupees). A quotation's are for any of the five: the field officer's is the officer's own limit. An industrial order's are for the State Manager, the Regional Manager and the MD (`md_ceo`); only the MD may have no limit. |
 | `territory_id` | string \| null |  | Null for the company-wide row. |
 | `max_amount` | number \| string \| null |  | Null for no ceiling. An order's is rupees including GST, above 0; a quotation's is a discount in percent, 0 to 100 (0: no discount without approval). |
 
@@ -994,6 +998,8 @@ One approval chain.
 | `gross` | string | yes |  |
 | `discount` | string | yes |  |
 | `freight` | string |  | FS-069: the freight before tax; 0.00 without freight. Default `0.00`. |
+| `installation` | string |  | FS-088: installation charges before tax; 0.00 without. Default `0.00`. |
+| `fittings` | string |  | FS-088: fittings material charges before tax; 0.00 without. Default `0.00`. |
 | `taxable` | string | yes |  |
 | `cgst` | string | yes |  |
 | `sgst` | string | yes |  |

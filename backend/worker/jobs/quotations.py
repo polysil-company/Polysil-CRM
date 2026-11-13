@@ -177,12 +177,12 @@ def render_html(doc: dict[str, Any]) -> str:
     lines = doc["lines"]
     block = print_block(doc)
     sent_on, until = _ist_date(q.get("sent_at")), _ist_date(q.get("valid_until"))
-    # FS-069 rule 16: freight's rate joins the lines', so one "@ rate" label prints
-    # only when lines and freight share a slab
-    freight = domain.freight_rates(q)
-    rated = [*lines, freight] if freight is not None else lines
+    # FS-069 rule 16, FS-088 rule 14: every charge's rate joins the lines', so one
+    # "@ rate" label prints only when lines and every charge share a slab
+    charges = domain.charge_rows(q)
+    rated = [*lines, *charges]
     return _env.get_template("quotation.html").render(
-        q=q, p=block, rows=domain.print_lines(lines),
+        q=q, p=block, rows=domain.print_lines(lines), charges=charges,
         tax_rows=tax_rows(q), place_of_supply=place_of_supply(q, block),
         sub_total=domain.goods_subtotal(q),
         cgst_rate=domain.shared_rate(rated, "cgst_rate"),

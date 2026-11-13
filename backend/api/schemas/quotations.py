@@ -25,7 +25,9 @@ from api.schemas.leads import (
     UserRef,
 )
 from api.schemas.products import (
+    FITTINGS_IN,
     GST_SLAB_DOC,
+    INSTALLATION_IN,
     MAX_LINES,
     FreightIn,
     FreightOut,
@@ -108,6 +110,8 @@ class QuotationLineIn(BaseModel):
         return (self.discount_pct, self.discount2_pct, self.discount3_pct)
 
 
+_INSTALLATION_IN = INSTALLATION_IN + "Only with at least one line."
+_FITTINGS_IN = FITTINGS_IN + "Only with at least one line."
 _FREIGHT_IN = ("FS-069: one freight or transport charge, before tax. Commercial and "
                "industrial only, and only with at least one line.")
 
@@ -149,6 +153,8 @@ class QuotationCreate(BaseModel):
         default_factory=list, max_length=MAX_LINES,
         description="One to 200. None is 422 no_lines (FS-073).")]
     freight: FreightIn | None = Field(default=None, description=_FREIGHT_IN)
+    installation: FreightIn | None = Field(default=None, description=_INSTALLATION_IN)
+    fittings: FreightIn | None = Field(default=None, description=_FITTINGS_IN)
 
     @property
     def partner_given(self) -> bool:
@@ -178,6 +184,10 @@ class QuotationPatch(BaseModel):
                                                 "clears the freight and every GST choice "
                                                 "(warning gst_choice_cleared); sending freight "
                                                 "with such a change is 422 freight_not_allowed.")
+    installation: FreightIn | None = Field(
+        default=None, description=_INSTALLATION_IN + " Omit to keep; null to remove.")
+    fittings: FreightIn | None = Field(
+        default=None, description=_FITTINGS_IN + " Omit to keep; null to remove.")
     expected_status: Annotated[Status | None, Field(
         default=None, description="Act only if the quotation is still in this status; "
                                   "otherwise 409 status_changed.")]
@@ -195,6 +205,10 @@ class LinesReplace(BaseModel):
         description="The whole basket, in order. Empty is 422 no_lines (FS-073).")]
     freight: FreightIn | None = Field(
         default=None, description=_FREIGHT_IN + " Omit to keep; null to remove.")
+    installation: FreightIn | None = Field(
+        default=None, description=_INSTALLATION_IN + " Omit to keep; null to remove.")
+    fittings: FreightIn | None = Field(
+        default=None, description=_FITTINGS_IN + " Omit to keep; null to remove.")
     expected_status: Status | None = None
 
 
@@ -302,12 +316,17 @@ class QuotationLine(BaseModel):
 
 class Totals(BaseModel):
     """`gross` and `discount` are the goods only; `taxable`, the taxes and `total`
-    include freight (FS-069), so `taxable = gross - discount + freight`."""
+    include freight (FS-069) and the FS-088 charges, so
+    `taxable = gross - discount + freight + installation + fittings`."""
 
     gross: str
     discount: str
     freight: str = Field(default="0.00", description="FS-069: the freight before tax; 0.00 "
                                                      "without freight.")
+    installation: str = Field(default="0.00", description="FS-088: installation charges "
+                                                          "before tax; 0.00 without.")
+    fittings: str = Field(default="0.00", description="FS-088: fittings material charges "
+                                                      "before tax; 0.00 without.")
     taxable: str
     cgst: str
     sgst: str
@@ -421,6 +440,10 @@ class Quotation(BaseModel):
     price_list_ids: list[str]
     lines: list[QuotationLine]
     freight: FreightOut | None = Field(default=None, description="FS-069: the freight, or null.")
+    installation: FreightOut | None = Field(default=None, description="FS-088: installation "
+                                                                      "charges, or null.")
+    fittings: FreightOut | None = Field(default=None, description="FS-088: fittings material "
+                                                                  "charges, or null.")
     gst_changed_lines: int = Field(default=0, description="FS-069: lines whose GST slab was "
                                                           "picked. Show it to an approver.")
     totals: Totals

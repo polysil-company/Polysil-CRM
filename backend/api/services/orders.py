@@ -67,7 +67,7 @@ from api.services.leads import (
     _route,
     _under,
 )
-from api.services.pricing import FreightSpec, LineSpec, PricedContext, _rate, _s
+from api.services.pricing import Charges, FreightSpec, LineSpec, PricedContext, _rate, _s
 from api.services.quotations import _STORAGE_DOWN
 from api.storage import Storage
 
@@ -205,9 +205,9 @@ async def _lock(db: AsyncSession, order_id: str) -> Any:
         "SELECT id, status::text AS status, lead_id, partner_id, place_of_supply_territory_id, "
         "seller_gstin_id, price_effective_date, territory_id, owner_org_unit_id, total, order_no, "
         "order_type::text AS order_type, tax_treatment, export_country, sample_pricing, "
-        "amend_count, party_gstin::text AS party_gstin, freight_amount, freight_slab, "
-        "freight_slab_chosen, freight_cgst, freight_sgst, freight_igst, freight_total "
-        "FROM sales_order WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL FOR UPDATE"),
+        "amend_count, party_gstin::text AS party_gstin, "
+        + ", ".join(pricing.CHARGE_COLUMNS)
+        + " FROM sales_order WHERE id = CAST(:o AS uuid) AND deleted_at IS NULL FOR UPDATE"),
         {"o": order_id})).one_or_none()
     if row is None:
         raise NotFoundError("No such order.")
@@ -333,17 +333,17 @@ async def _linked_quotations(db: AsyncSession, order_id: str) -> list[str]:
 async def _price(db: AsyncSession, *, partner_id: str | None, pos: str, seller: str | None,
                  as_of: dt.date | None, specs: list[LineSpec], existing: bool,
                  order_type: str, submitting: bool = False,
-                 treatment: str = "domestic", freight: FreightSpec | None,
+                 treatment: str = "domestic", charges: Charges,
                  offered: Sequence[Decimal] | None = None) -> PricedContext:
     """Rates at the price date, tax at today (rule 3), under the order's stored
     treatment (FS-042 rule 5), from the lists for the order's type (FS-061).
-    `freight` has no default: every caller passes what the order holds or what the
-    request says (FS-069 rule 9); `offered` only on input (rule 3)."""
+    `charges` has no default: every caller passes what the order holds or what the
+    request says (FS-069 rule 9; FS-088); `offered` only on input (rule 3)."""
     try:
         return await pricing.price_document(
             db, partner_id=partner_id, place_of_supply_territory_id=pos, seller_gstin_id=seller,
             as_of=as_of, lines=specs, existing=existing, tax_as_of=today_ist(),
-            sales_type=order_type, tax_treatment=treatment, freight=freight, offered=offered)
+            sales_type=order_type, tax_treatment=treatment, charges=charges, offered=offered)
     except ValidationFailed as exc:
         if exc.fields and "as_of" in exc.fields:
             exc.fields = {("price_effective_date" if k == "as_of" else k): v
@@ -378,9 +378,7 @@ def _compare_stored(stored: list[Any], ctx: PricedContext, head: Any) -> None:
     """At submit: the stored lines against a fresh resolution, ids and every
     printed figure (FS-005 9.7 A-1), freight's included (FS-069 rule 9)."""
     fields: dict[str, str] = {}
-    drift = pricing.freight_drift(head, ctx.document.freight)
-    if drift:
-        fields["freight"] = drift
+    fields.update(pricing.charges_drift(head, ctx.document))
     for i, (row, p) in enumerate(zip(stored, ctx.document.lines, strict=True)):
         if str(row.price_list_item_id) != p.rate.price_list_item_id:
             fields[f"lines[{i}].rate"] = f"{_s(row.rate)} -> {_s(p.rate.rate)}"
@@ -464,9 +462,7 @@ async def _write_figures(db: AsyncSession, order_id: str, ctx: PricedContext,
                 price_effective_date = :day, price_list_id = CAST(:pl AS uuid),
                 gross = :gross, discount = :disc, taxable = :taxable, cgst = :cgst, sgst = :sgst,
                 igst = :igst, total = :total, is_provisional = :prov,
-                updated_by = CAST(:me AS uuid), freight_amount = :fa, freight_slab = :fs,
-                freight_slab_chosen = :fc,
-                freight_cgst = :fcg, freight_sgst = :fsg, freight_igst = :fig, freight_total = :ft
+                updated_by = CAST(:me AS uuid), """ + pricing.CHARGE_SET_SQL + """
             WHERE id = CAST(:o AS uuid)"""),
             {"sg": ctx.seller_gstin_id, "ps": ctx.place_of_supply_state_id,
              "intra": ctx.intra_state, "day": ctx.as_of,
@@ -474,7 +470,7 @@ async def _write_figures(db: AsyncSession, order_id: str, ctx: PricedContext,
              "gross": t.gross, "disc": t.discount, "taxable": t.taxable, "cgst": t.cgst,
              "sgst": t.sgst, "igst": t.igst, "total": t.total,
              "prov": any(p.provisional_fields for p in ctx.document.lines),
-             "me": caller.user_id, "o": order_id, **pricing.freight_params(ctx.document.freight)})
+             "me": caller.user_id, "o": order_id, **pricing.charge_params(ctx.document)})
     except DBAPIError as exc:
         raise map_db_error(exc) from exc
 
@@ -493,16 +489,22 @@ def _body_specs(lines: list[QuotationLineIn]) -> list[LineSpec]:
             for ln in lines]
 
 
-def _quotations_freight(rows: list[Any]) -> FreightSpec | None:
-    """FS-069 rule 11: the quotations' freight summed; its slab chosen only when every
-    quotation with freight chose the same one."""
-    carrying = [r for r in rows if r.freight_amount is not None]
+def _quotations_freight(rows: list[Any], kind: str = "freight") -> FreightSpec | None:
+    """FS-069 rule 11, FS-088 rule 8: the quotations' charge summed; its slab chosen
+    only when every quotation with that charge chose the same one."""
+    def col(r: Any, x: str) -> Any:
+        return getattr(r, f"{kind}_{x}")
+    carrying = [r for r in rows if col(r, "amount") is not None]
     if not carrying:
         return None
-    slabs = {Decimal(r.freight_slab) if r.freight_slab_chosen else None for r in carrying}
+    slabs = {Decimal(col(r, "slab")) if col(r, "slab_chosen") else None for r in carrying}
     only = next(iter(slabs)) if len(slabs) == 1 else None
-    return FreightSpec(amount=sum((Decimal(r.freight_amount) for r in carrying), Decimal(0)),
+    return FreightSpec(amount=sum((Decimal(col(r, "amount")) for r in carrying), Decimal(0)),
                        gst_slab=only)
+
+
+def _quotations_charges(rows: list[Any]) -> Charges:
+    return {k: _quotations_freight(rows, k) for k in pricing.CHARGE_KINDS}
 
 
 async def _stored(db: AsyncSession, order_id: str) -> list[Any]:
@@ -595,9 +597,9 @@ def _line_out(r: Any) -> sch.OrderLine:
 
 
 def _totals(r: Any) -> Totals:
-    # the header identity (077's CHECK) gives the freight without another column
-    freight = Decimal(r.taxable) - Decimal(r.gross) + Decimal(r.discount)
-    return Totals(gross=_money(r.gross), discount=_money(r.discount), freight=_money(freight),
+    # FS-088 rule 13: each charge from its own column, never derived from the identity
+    return Totals(gross=_money(r.gross), discount=_money(r.discount),
+                  **{k: _money(getattr(r, f"{k}_amount") or 0) for k in pricing.CHARGE_KINDS},
                   taxable=_money(r.taxable), cgst=_money(r.cgst), sgst=_money(r.sgst),
                   igst=_money(r.igst), total=_money(r.total))
 
@@ -689,7 +691,9 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         export_country=r.export_country, lut_arn=r.lut_arn, sample_pricing=r.sample_pricing,
         price_effective_date=r.price_effective_date.isoformat(),
         tax_date=_iso(r.tax_date), is_provisional=r.is_provisional, lines=lines,
-        freight=pricing.freight_from_row(r),
+        freight=pricing.charge_from_row(r, "freight"),
+        installation=pricing.charge_from_row(r, "installation"),
+        fittings=pricing.charge_from_row(r, "fittings"),
         gst_changed_lines=sum(1 for ln in lines if ln.gst_slab_chosen),
         totals=totals, approval=approval, last_rejection=last_rejection,
         dispatches=await _dispatches(db, order_id, portal),
@@ -978,8 +982,9 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
         "q.owner_user_id, q.owner_org_unit_id, q.territory_id, q.party_name, q.party_mobile, "
         "q.party_address, q.party_gstin::text AS party_gstin, q.quote_no::text AS quote_no, "
         "q.sales_type::text AS sales_type, q.tax_treatment, q.export_country, "
-        "q.freight_amount, q.freight_slab, q.freight_slab_chosen "
-        "FROM quotation q WHERE q.id = ANY(CAST(:ids AS uuid[])) AND q.deleted_at IS NULL"),
+        + ", ".join(f"q.{k}_{x}" for k in pricing.CHARGE_KINDS
+                    for x in ("amount", "slab", "slab_chosen"))
+        + " FROM quotation q WHERE q.id = ANY(CAST(:ids AS uuid[])) AND q.deleted_at IS NULL"),
         {"ids": ids})).all()
     if len(rows) != len(ids):
         raise NotFoundError("No such quotation.")
@@ -1073,7 +1078,7 @@ async def _from_quotations(db: AsyncSession, caller: Caller, body: sch.OrderCrea
             "pos": str(first.place_of_supply_territory_id),
             "seller": str(first.seller_gstin_id), "day": first.price_effective_date,
             "lines": list(lines), "mode": _Mode(first.tax_treatment, None),
-            "country": first.export_country, "freight": _quotations_freight(list(rows))}
+            "country": first.export_country, "charges": _quotations_charges(list(rows))}
 
 
 def _repriced(source: list[Any], ctx: PricedContext) -> list[str]:
@@ -1240,12 +1245,14 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                                    code="quotations_disagree",
                                    fields={"export_country": "fixed by the quotations"})
         keeps = body.order_type in pricing.CHOICE_TYPES and mode.treatment == "domestic"
-        given = "freight" in body.model_fields_set
+        given = set(pricing.CHARGE_KINDS) & body.model_fields_set
+        summed: Charges = src["charges"] if keeps else {}
+        charges = {k: (pricing.freight_spec(getattr(body, k)) if k in given else summed.get(k))
+                   for k in pricing.CHARGE_KINDS}
         ctx = await _price(db, partner_id=src["partner"], pos=src["pos"], seller=src["seller"],
                            as_of=src["day"], specs=_specs(src["lines"], keep_choice=keeps),
                            existing=True, order_type=body.order_type, treatment=mode.treatment,
-                           freight=(pricing.freight_spec(body.freight) if given
-                                    else src["freight"] if keeps else None),
+                           charges=charges,
                            offered=await pricing.slab_choices(db) if given else None)
         warnings += _repriced(src["lines"], ctx)
         if body.order_type == domain.SUBSIDISED:
@@ -1294,7 +1301,7 @@ async def create_order(db: AsyncSession, caller: Caller, body: sch.OrderCreate,
                            as_of=body.price_effective_date,
                            specs=_moded(_body_specs(body.lines), mode),
                            existing=False, order_type=body.order_type, treatment=mode.treatment,
-                           freight=pricing.freight_spec(body.freight),
+                           charges=pricing.request_charges(body),
                            offered=await pricing.slab_choices(db))
         _compare_preview(body.lines, ctx)
     await _check_sample(db, body.order_type, ctx)
@@ -1402,18 +1409,22 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
     stored = await _stored(db, order_id)
     # FS-069 rule 2: a type that takes no choice and no freight clears both
     keeps = new_type in pricing.CHOICE_TYPES and mode.treatment == "domestic"
-    given = "freight" in body.model_fields_set
-    if given and body.freight is not None and not keeps:
-        raise ValidationFailed("Freight is for commercial and industrial orders only.",
-                               code="freight_not_allowed", fields={"freight": "Not allowed."})
-    freight = pricing.freight_spec(body.freight) if given else pricing.stored_freight(row)
+    given = set(pricing.CHARGE_KINDS) & body.model_fields_set
+    sent = [k for k in pricing.CHARGE_KINDS if k in given and getattr(body, k) is not None]
+    if sent and not keeps:
+        refused = sent[0]
+        raise ValidationFailed(f"{refused.title()} is for commercial and industrial orders only.",
+                               code="freight_not_allowed" if refused == "freight"
+                               else "charge_not_allowed", fields={refused: "Not allowed."})
+    charges = pricing.request_charges(body, row)
     cleared_lines = sum(1 for r in stored if r.gst_slab_chosen) if not keeps else 0
-    cleared_freight = row.freight_amount is not None and not keeps
+    # FS-088 rule 15: any charge, not freight alone
+    cleared_freight = pricing.has_charge(row) and not keeps
     ctx = await _price(db, partner_id=partner, pos=pos, seller=seller, as_of=day,
                        specs=_moded(_specs(stored, keep_choice=keeps), mode,
                                     was_free=row.sample_pricing == "free"),
                        existing=True, order_type=new_type, treatment=mode.treatment,
-                       freight=freight if keeps else None,
+                       charges=charges if keeps else {},
                        offered=await pricing.slab_choices(db) if given else None)
     await _check_sample(db, new_type, ctx)
     await _check_lut(db, mode.treatment, ctx.seller_gstin_id)
@@ -1461,7 +1472,9 @@ async def patch_order(db: AsyncSession, caller: Caller, order_id: str, body: sch
                         for r in stored])
     if keeps:
         await _write_figures(db, order_id, ctx, caller)
-    extra = ({"cleared": {"lines": cleared_lines, "freight": cleared_freight}}
+    extra = ({"cleared": {"lines": cleared_lines,
+                          **{k: getattr(row, f"{k}_amount") is not None
+                             for k in pricing.CHARGE_KINDS}}}
              if cleared_lines or cleared_freight else {})
     await _emit(db, order_id=order_id, lead_id=row.lead_id, kind="order.updated",
                 actor_id=caller.user_id, fields=sorted(body.model_fields_set - {"expected_status"}),
@@ -1484,9 +1497,7 @@ async def replace_lines(db: AsyncSession, caller: Caller, order_id: str,
                        as_of=row.price_effective_date,
                        specs=_moded(_body_specs(body.lines), mode),
                        existing=False, order_type=row.order_type, treatment=mode.treatment,
-                       freight=(pricing.freight_spec(body.freight)
-                                if "freight" in body.model_fields_set
-                                else pricing.stored_freight(row)),
+                       charges=pricing.request_charges(body, row),
                        offered=await pricing.slab_choices(db))
     _compare_preview(body.lines, ctx)
     await _check_sample(db, row.order_type, ctx)
@@ -1514,7 +1525,7 @@ async def submit_order(db: AsyncSession, caller: Caller, order_id: str,
                        pos=str(row.place_of_supply_territory_id), seller=str(row.seller_gstin_id),
                        as_of=row.price_effective_date, specs=_specs(stored), existing=True,
                        order_type=row.order_type, submitting=True, treatment=row.tax_treatment,
-                       freight=pricing.stored_freight(row))
+                       charges=pricing.stored_charges(row))
     _compare_stored(stored, ctx, row)
     _check_staff(caller, row.order_type)
     await _check_sample(db, row.order_type, ctx)
