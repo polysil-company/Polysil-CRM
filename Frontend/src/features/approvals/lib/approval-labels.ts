@@ -137,6 +137,8 @@ export function limitRoleLabel(role: string): string {
       return "Field officer";
     case "admin_sales":
       return "Admin-Sales";
+    case "md_ceo":
+      return "MD / CEO";
     default:
       return roleLabel(role);
   }

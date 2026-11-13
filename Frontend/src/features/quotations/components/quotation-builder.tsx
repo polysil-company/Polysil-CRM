@@ -33,9 +33,10 @@ import {
 } from "@/features/quotations/api/quotations.schemas";
 import { emptyLine, usePricedLines } from "@/features/quotations/hooks/use-priced-lines";
 import {
-  draftFreightFrom,
+  chargesPresent,
+  chargesToSave,
+  draftChargesFrom,
   draftLinesFrom,
-  freightToSave,
   linesToSave,
   readAnyFields,
   routeSaveErrors,
@@ -201,7 +202,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
       source.mode === "edit" && source.quotation.lines.length > 0
         ? draftLinesFrom(source.quotation.lines, createRequestId)
         : [emptyLine()],
-    source.mode === "edit" ? draftFreightFrom(source.quotation.freight) : undefined,
+    source.mode === "edit" ? draftChargesFrom(source.quotation) : undefined,
   );
   // APP-009 (I-05) · The lines as the draft opened, so a terms-only edit doesn't re-save them and
   // add "Items changed" to the history. The plan is worked out from the rows, so it is ready here.
@@ -225,8 +226,8 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
           : [];
       const party = partyFrom(values);
       const terms = values.terms.trim() === "" ? null : values.terms.trim();
-      // QUOT-015 · Freight only where the sale takes it; elsewhere the backend clears it.
-      const freight = priced.gstChoice ? freightToSave(priced.plan) : undefined;
+      // QUOT-015, QUOT-016 · Charges only where the sale takes them; elsewhere the backend clears them.
+      const charges = priced.gstChoice ? chargesToSave(priced.plan) : undefined;
       if (source.mode === "create") {
         const body = {
           lead_id: source.lead.id,
@@ -235,7 +236,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
           party,
           terms,
           lines: saved,
-          ...(freight === undefined || freight === null ? {} : { freight }),
+          ...(charges === undefined ? {} : chargesPresent(charges)),
         };
         return create.mutateAsync({ body, idempotencyKey: idempotency.keyFor(body) });
       }
@@ -254,7 +255,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
       };
       const linesBody = {
         lines: saved,
-        ...(freight === undefined ? {} : { freight }),
+        ...(charges ?? {}),
         expected_status: "draft" as const,
       };
       return update.mutateAsync({
@@ -289,7 +290,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
     const fields = isApiError(error) && error.details !== undefined ? readAnyFields(error) : {};
     const routed = routeSaveErrors(fields, priced.plan.keys);
     priced.setLineErrors(routed.lines);
-    priced.setFreightSaveError(routed.freight);
+    priced.setChargeSaveErrors(routed.charges);
     for (const [field, message] of Object.entries(routed.header)) {
       const name = HEADER_FIELD_NAMES.find((candidate) => candidate === field);
       if (name !== undefined) {
@@ -359,7 +360,7 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
         if (
           Object.keys(routed.header).length > 0 ||
           Object.keys(routed.lines).length > 0 ||
-          routed.freight !== null
+          Object.values(routed.charges).some((message) => message !== null)
         ) {
           setFormError(null);
           return;

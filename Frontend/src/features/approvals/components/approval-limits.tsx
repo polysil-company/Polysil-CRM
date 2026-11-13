@@ -35,7 +35,14 @@ const LADDERS: readonly {
     docType: "sales_order",
     title: "Order value",
     explain:
-      "Including GST. Each manager approves orders up to their limit; a bigger order goes on to the next level, then to Accounts and Dispatch.",
+      "Including GST. Each manager approves orders up to their limit; a bigger order goes on to the next level, then to Accounts and Dispatch. Industrial orders have their own ladder below.",
+    unit: "inr",
+  },
+  {
+    docType: "industrial_order",
+    title: "Industrial order value",
+    explain:
+      "Including GST. Industrial business has its own ladder: the State Manager, then the Regional Manager, then the MD / CEO, with no District Manager step. Accounts and Dispatch follow.",
     unit: "inr",
   },
   {

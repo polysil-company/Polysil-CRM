@@ -149,7 +149,62 @@ export function gstChangeNote(line: {
     : null;
 }
 
-/** QUOT-015 · The totals row for freight: "Freight (GST 18%)". */
-export function freightLabel(freight: { readonly gstSlab: string }): string {
-  return `Freight (GST ${formatRate(freight.gstSlab)})`;
+/**
+ * QUOT-015, QUOT-016 · What each charge is called, as the printed quotation and order call it
+ * (FS-088), and what its GST is when no slab is picked. Freight prints as "Transportation".
+ */
+export const CHARGE_LABELS = {
+  freight: {
+    name: "Transportation",
+    defaultSlab: "Highest of the items",
+    defaultNote: "highest of the items",
+  },
+  installation: {
+    name: "Installation charges",
+    defaultSlab: "18% (a service)",
+    defaultNote: "the service rate",
+  },
+  fittings: {
+    name: "Fittings material charges",
+    defaultSlab: "Highest of the items",
+    defaultNote: "highest of the items",
+  },
+} as const satisfies Record<
+  string,
+  { readonly name: string; readonly defaultSlab: string; readonly defaultNote: string }
+>;
+
+/** QUOT-015, QUOT-016 · The totals row for a charge: "Installation charges (GST 18%)". */
+export function chargeLabel(
+  kind: keyof typeof CHARGE_LABELS,
+  charge: { readonly gstSlab: string },
+): string {
+  return `${CHARGE_LABELS[kind].name} (GST ${formatRate(charge.gstSlab)})`;
+}
+
+/** QUOT-015, QUOT-016 · A saved charge, as the totals print it. */
+interface SavedCharge {
+  readonly amount: string;
+  readonly gstSlab: string;
+}
+
+/**
+ * QUOT-015, QUOT-016 · The totals rows for a document's charges, in print order: one per charge
+ * it carries, labelled with its GST. Charges are taxed inside the taxable value.
+ */
+export function chargeTotalRows(document: {
+  readonly freight: SavedCharge | null;
+  readonly installation: SavedCharge | null;
+  readonly fittings: SavedCharge | null;
+}): {
+  readonly kind: keyof typeof CHARGE_LABELS;
+  readonly label: string;
+  readonly amount: string;
+}[] {
+  return (["freight", "installation", "fittings"] as const).flatMap((kind) => {
+    const charge = document[kind];
+    return charge === null
+      ? []
+      : [{ kind, label: chargeLabel(kind, charge), amount: charge.amount }];
+  });
 }

@@ -299,9 +299,9 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
       await user.click(screen.getByRole("option", { name: "5%" }));
       expect(await within(item).findByText("Changed from 18%")).toBeInTheDocument();
 
-      await user.type(screen.getByLabelText("Freight before tax (optional)"), "1500");
+      await user.type(screen.getByLabelText("Transportation before tax (optional)"), "1500");
       const totals = screen.getByLabelText("Totals");
-      expect(await within(totals).findByText("Freight", {}, PRICED)).toBeInTheDocument();
+      expect(await within(totals).findByText("Transportation", {}, PRICED)).toBeInTheDocument();
       expect(
         await screen.findByText(/GST 5% \(highest of the items\)/, {}, PRICED),
       ).toBeInTheDocument();
@@ -335,11 +335,11 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
     const user = showNew(leadAt("qualified"));
     await screen.findByRole("form", { name: "New quotation" });
 
-    await user.type(screen.getByLabelText("Freight before tax (optional)"), "12.345");
+    await user.type(screen.getByLabelText("Transportation before tax (optional)"), "12.345");
     expect(
       await screen.findByText("Rupees above 0, with at most two decimals"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Freight before tax (optional)")).toHaveAttribute(
+    expect(screen.getByLabelText("Transportation before tax (optional)")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
@@ -385,7 +385,7 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
     showNew(lead.id);
     await screen.findByRole("form", { name: "New quotation" });
 
-    expect(screen.queryByLabelText("Freight before tax (optional)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Transportation before tax (optional)")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "GST for item 1" })).not.toBeInTheDocument();
   });
 
@@ -422,7 +422,7 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
     const form = await screen.findByRole("form", { name: /^Edit / });
     const item = within(form).getByRole("listitem", { name: "Item 1" });
     expect(within(item).getByRole("combobox", { name: "GST for item 1" })).toHaveTextContent("40%");
-    expect(within(form).getByLabelText("Freight before tax (optional)")).toHaveValue("2000");
+    expect(within(form).getByLabelText("Transportation before tax (optional)")).toHaveValue("2000");
 
     const save = within(form).getByRole("button", { name: "Save changes" });
     await waitFor(() => {
@@ -435,6 +435,86 @@ describe("[QUOT-015] A GST slab per item, and freight", () => {
     const replaced = bodies.find((entry) => entry.path.endsWith("/lines"));
     expect(linesOf(replaced?.body ?? {})[0]).toMatchObject({ gst_slab: "40" });
     expect(replaced?.body.freight).toEqual({ amount: "2000" });
+  });
+  it(
+    "[QUOT-016] adds installation at 18% and fittings at a picked slab, and saves them both",
+    PRICING_TEST,
+    async () => {
+      signInAsAdmin();
+      const bodies = recordBodies();
+      const user = showNew(leadAt("qualified"));
+      await screen.findByRole("form", { name: "New quotation" });
+      await addPipe(user, "10");
+      await within(screen.getByRole("listitem", { name: "Item 1" })).findByText("Rate", {}, PRICED);
+
+      await user.type(screen.getByLabelText("Installation charges before tax (optional)"), "8000");
+      await user.type(
+        screen.getByLabelText("Fittings material charges before tax (optional)"),
+        "2500",
+      );
+      await user.click(screen.getByRole("combobox", { name: "GST on fittings material charges" }));
+      await user.click(await screen.findByRole("option", { name: "5%" }));
+
+      const totals = screen.getByLabelText("Totals");
+      expect(
+        await within(totals).findByText("Installation charges", {}, PRICED),
+      ).toBeInTheDocument();
+      expect(within(totals).getByText("Fittings material charges")).toBeInTheDocument();
+      expect(
+        await screen.findByText(/GST 18% \(the service rate\)/, {}, PRICED),
+      ).toBeInTheDocument();
+
+      const save = screen.getByRole("button", { name: "Save draft" });
+      await waitFor(() => {
+        expect(save).toBeEnabled();
+      }, PRICED);
+      await user.click(save);
+      await waitFor(() => {
+        expect(push).toHaveBeenCalledTimes(1);
+      });
+
+      const created = bodies.find((entry) => entry.path.endsWith("/quotations"));
+      expect(created?.body.installation).toEqual({ amount: "8000" });
+      expect(created?.body.fittings).toEqual({ amount: "2500", gst_slab: "5" });
+      expect(created?.body).not.toHaveProperty("freight");
+      const [saved] = mockDb.quotations;
+      expect(saved?.installation).toMatchObject({ amount: "8000.00", gst_slab: "18.000" });
+      expect(saved?.fittings).toMatchObject({ amount: "2500.00", gst_slab: "5.000" });
+      expect(saved?.totals.installation).toBe("8000.00");
+    },
+  );
+
+  it("[QUOT-016] puts a refused installation charge on its own field", async () => {
+    signInAsAdmin();
+    server.use(
+      http.post(buildApiUrl("/pricing/quote-lines"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "charge_amount_invalid",
+              message: "installation must be above zero.",
+              fields: { "installation.amount": "Rupees above 0, with at most two decimals." },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = showNew(leadAt("qualified"));
+    await screen.findByRole("form", { name: "New quotation" });
+    await addPipe(user, "10");
+    await user.type(screen.getByLabelText("Installation charges before tax (optional)"), "8000");
+
+    expect(
+      await screen.findByText("Rupees above 0, with at most two decimals.", {}, PRICED),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Installation charges before tax (optional)")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByLabelText("Transportation before tax (optional)")).not.toHaveAttribute(
+      "aria-invalid",
+    );
   });
 });
 
@@ -531,6 +611,6 @@ describe("[APP-009] The builder after the live test (I-03, I-05, Y-03)", () => {
     renderWithProviders(<EditQuotation quotationId={draft.id} />);
 
     const totals = await screen.findByLabelText("Totals");
-    expect(await within(totals).findByText("Freight", {}, PRICED)).toBeInTheDocument();
+    expect(await within(totals).findByText("Transportation", {}, PRICED)).toBeInTheDocument();
   });
 });

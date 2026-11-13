@@ -184,22 +184,45 @@ export function gstChangedLines(
   return lines.filter((line) => line.gst_slab_chosen === true).length;
 }
 
-/** The sums of the lines; freight joins taxable, the taxes and the total, never gross. */
+/** QUOT-016 · Installation and fittings charges as priced (FS-088); none when left out. */
+export interface MockExtraCharges {
+  readonly installation?: FreightWire | null;
+  readonly fittings?: FreightWire | null;
+}
+
+/** QUOT-015, QUOT-016 · Each part of every charge summed, in rupees and paise. */
+export function chargeSum(
+  charges: readonly (FreightWire | null | undefined)[],
+  field: "amount" | "cgst" | "sgst" | "igst" | "total",
+): string {
+  return paise(
+    charges.reduce((sum, charge) => sum + Math.round(Number(charge?.[field] ?? "0") * 100), 0),
+  );
+}
+
+/**
+ * The sums of the lines; every charge joins taxable, the taxes and the total, never gross.
+ * Each charge has its own total too (QUOT-016).
+ */
 export function totalsOf(
   lines: readonly QuotationLineWire[],
   freight: FreightWire | null = null,
+  extras: MockExtraCharges = {},
 ): QuotationWire["totals"] {
-  const add = (sum: string, part: string | undefined): string =>
-    paise(Math.round(Number(sum) * 100) + Math.round(Number(part ?? "0") * 100));
+  const charges = [freight, extras.installation, extras.fittings];
+  const add = (sum: string, part: string): string =>
+    paise(Math.round(Number(sum) * 100) + Math.round(Number(part) * 100));
   return {
     gross: sumField(lines, "gross"),
     discount: sumField(lines, "discount"),
     freight: freight?.amount ?? "0.00",
-    taxable: add(sumField(lines, "taxable"), freight?.amount),
-    cgst: add(sumField(lines, "cgst"), freight?.cgst),
-    sgst: add(sumField(lines, "sgst"), freight?.sgst),
-    igst: add(sumField(lines, "igst"), freight?.igst),
-    total: add(sumField(lines, "total"), freight?.total),
+    installation: extras.installation?.amount ?? "0.00",
+    fittings: extras.fittings?.amount ?? "0.00",
+    taxable: add(sumField(lines, "taxable"), chargeSum(charges, "amount")),
+    cgst: add(sumField(lines, "cgst"), chargeSum(charges, "cgst")),
+    sgst: add(sumField(lines, "sgst"), chargeSum(charges, "sgst")),
+    igst: add(sumField(lines, "igst"), chargeSum(charges, "igst")),
+    total: add(sumField(lines, "total"), chargeSum(charges, "total")),
   };
 }
 
@@ -425,6 +448,9 @@ export interface MockDraftInput {
   readonly lines: readonly QuotationLineWire[];
   /** QUOT-015 · The freight as priced; none when left out. */
   readonly freight?: FreightWire | null;
+  /** QUOT-016 · Installation and fittings charges as priced; none when left out. */
+  readonly installation?: FreightWire | null;
+  readonly fittings?: FreightWire | null;
   readonly createdAt: string;
 }
 
@@ -447,13 +473,19 @@ export function withLines(
   lines: readonly QuotationLineWire[],
   extraWarnings: readonly string[] = [],
   freight: FreightWire | null = draft.freight ?? null,
+  extras: MockExtraCharges = {
+    installation: draft.installation ?? null,
+    fittings: draft.fittings ?? null,
+  },
 ): QuotationWire {
   return {
     ...draft,
     lines: [...lines],
     freight,
+    installation: extras.installation ?? null,
+    fittings: extras.fittings ?? null,
     gst_changed_lines: gstChangedLines(lines),
-    totals: totalsOf(lines, freight),
+    totals: totalsOf(lines, freight, extras),
     is_provisional: lines.some((line) => line.provisional_fields.length > 0),
     warnings: [...provisionalWarnings(lines), ...extraWarnings],
     discount: discountInfo(lines),
@@ -487,8 +519,10 @@ export function mockDraft(input: MockDraftInput): QuotationWire {
     price_list_ids: [PRICE_LIST.id],
     lines,
     freight: input.freight ?? null,
+    installation: input.installation ?? null,
+    fittings: input.fittings ?? null,
     gst_changed_lines: gstChangedLines(lines),
-    totals: totalsOf(lines, input.freight ?? null),
+    totals: totalsOf(lines, input.freight ?? null, input),
     is_provisional: provisional,
     warnings: provisionalWarnings(lines),
     terms: input.terms,

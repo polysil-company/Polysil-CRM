@@ -9,7 +9,13 @@ import type {
 import type { FreightWire, QuotationWire } from "@/features/quotations/api/quotations.schemas";
 
 import { orderManagersFor } from "./approvals";
-import { gstChangedLines, MOCK_PRODUCTS, MOCK_SELLER } from "./quotations";
+import {
+  chargeSum,
+  gstChangedLines,
+  MOCK_PRODUCTS,
+  MOCK_SELLER,
+  type MockExtraCharges,
+} from "./quotations";
 import { MOCK_ID_SPACE, MOCK_STAFF, mockUuid } from "./reference";
 
 /**
@@ -43,9 +49,10 @@ export function chainFor(
   total: string,
   thresholds: readonly ThresholdWire[],
   territoryId: string | null,
+  orderType: string | null = null,
 ): string[] {
   return [
-    ...orderManagersFor(total, thresholds, territoryId),
+    ...orderManagersFor(total, thresholds, territoryId, orderType),
     "account_manager",
     "dispatch_manager",
   ];
@@ -250,6 +257,9 @@ export interface MockDirectOrderInput {
   readonly lines: readonly QuotationWire["lines"][number][];
   /** QUOT-015 · The freight as priced; none when left out. */
   readonly freight?: FreightWire | null;
+  /** QUOT-016 · Installation and fittings charges as priced; none when left out. */
+  readonly installation?: FreightWire | null;
+  readonly fittings?: FreightWire | null;
   readonly orderType: OrderWire["order_type"];
   readonly deliveryAddress: string | null;
   readonly paymentTerms: OrderWire["payment_terms"];
@@ -286,7 +296,7 @@ export function mockDirectOrder(input: MockDirectOrderInput): OrderWire {
     intra_state: true,
     price_effective_date: input.createdAt.slice(0, 10),
     tax_date: input.createdAt.slice(0, 10),
-    ...withOrderLines(lines, input.freight ?? null),
+    ...withOrderLines(lines, input.freight ?? null, input),
     approval: null,
     last_rejection: null,
     dispatches: [],
@@ -309,24 +319,39 @@ export function mockDirectOrder(input: MockDirectOrderInput): OrderWire {
 export function withOrderLines(
   lines: readonly OrderLineWire[],
   freight: FreightWire | null = null,
-): Pick<OrderWire, "lines" | "totals" | "is_provisional" | "freight" | "gst_changed_lines"> {
-  const add = (sum: string, part: string | undefined): string =>
-    ((Math.round(Number(sum) * 100) + Math.round(Number(part ?? "0") * 100)) / 100).toFixed(2);
+  extras: MockExtraCharges = {},
+): Pick<
+  OrderWire,
+  | "lines"
+  | "totals"
+  | "is_provisional"
+  | "freight"
+  | "installation"
+  | "fittings"
+  | "gst_changed_lines"
+> {
+  const charges = [freight, extras.installation, extras.fittings];
+  const add = (sum: string, part: string): string =>
+    ((Math.round(Number(sum) * 100) + Math.round(Number(part) * 100)) / 100).toFixed(2);
   return {
     is_provisional: lines.some((line) => line.provisional_fields.length > 0),
     lines: [...lines],
-    // QUOT-015 · freight joins taxable, the taxes and the total, never gross or discount
+    // QUOT-015, QUOT-016 · charges join taxable, the taxes and the total, never gross or discount
     freight,
+    installation: extras.installation ?? null,
+    fittings: extras.fittings ?? null,
     gst_changed_lines: gstChangedLines(lines),
     totals: {
       gross: sumMoney(lines, "gross"),
       discount: sumMoney(lines, "discount"),
       freight: freight?.amount ?? "0.00",
-      taxable: add(sumMoney(lines, "taxable"), freight?.amount),
-      cgst: add(sumMoney(lines, "cgst"), freight?.cgst),
-      sgst: add(sumMoney(lines, "sgst"), freight?.sgst),
-      igst: add(sumMoney(lines, "igst"), freight?.igst),
-      total: add(sumMoney(lines, "total"), freight?.total),
+      installation: extras.installation?.amount ?? "0.00",
+      fittings: extras.fittings?.amount ?? "0.00",
+      taxable: add(sumMoney(lines, "taxable"), chargeSum(charges, "amount")),
+      cgst: add(sumMoney(lines, "cgst"), chargeSum(charges, "cgst")),
+      sgst: add(sumMoney(lines, "sgst"), chargeSum(charges, "sgst")),
+      igst: add(sumMoney(lines, "igst"), chargeSum(charges, "igst")),
+      total: add(sumMoney(lines, "total"), chargeSum(charges, "total")),
     },
   };
 }
@@ -500,6 +525,7 @@ function seedState(
 ): OrderWire {
   const submittedMs = createdMs + 2 * HOUR;
   const steps = chainSteps(
+    // The seeded chains keep the general ladder; a submit picks the industrial one (APPR-003).
     chainFor(order.totals.total, thresholds, order.territory.id),
     50_000 + index * 10,
   );

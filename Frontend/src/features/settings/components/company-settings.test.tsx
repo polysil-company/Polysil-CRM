@@ -199,7 +199,7 @@ describe("[QUOT-015] The GST slabs on offer", () => {
     const user = show(<CompanySettings />);
 
     const slabs = await screen.findByRole("group", {
-      name: "GST slabs an item or freight can be set to",
+      name: "GST slabs an item or a charge can be set to",
     });
     expect(within(slabs).getByRole("checkbox", { name: "40%" })).toBeChecked();
     await user.click(within(slabs).getByRole("checkbox", { name: "0%" }));
@@ -215,7 +215,7 @@ describe("[QUOT-015] The GST slabs on offer", () => {
     const user = show(<CompanySettings />);
 
     const slabs = await screen.findByRole("group", {
-      name: "GST slabs an item or freight can be set to",
+      name: "GST slabs an item or a charge can be set to",
     });
     for (const name of ["0%", "5%", "18%", "40%"]) {
       await user.click(within(slabs).getByRole("checkbox", { name }));

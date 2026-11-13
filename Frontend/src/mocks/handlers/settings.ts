@@ -243,7 +243,7 @@ export function mockSettings(): SettingWire[] {
     slabs(
       "gst_slab_choices",
       ["0", "5", "18", "40"],
-      "The GST slabs a commercial or industrial line, and freight, may be set to.",
+      "The GST slabs a commercial or industrial line, and each charge (transportation, installation, fittings), may be set to.",
     ),
     // FS-071 (migration 078)
     int(

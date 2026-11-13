@@ -93,3 +93,55 @@ describe("[APPR-002] ApprovalLimits", () => {
     });
   });
 });
+
+describe("[APPR-003] The industrial order ladder", () => {
+  afterEach(() => {
+    resetMockDb();
+    writeMockRole("state_manager");
+  });
+
+  it("shows industrial orders' own ladder, up to the MD / CEO", async () => {
+    signInAs("state_manager");
+    renderWithProviders(<ApprovalLimits />);
+
+    const ladder = await screen.findByRole("list", {
+      name: "Industrial order value, company-wide",
+    });
+    expect(within(ladder).getByText("State Manager")).toBeInTheDocument();
+    expect(within(ladder).getByText("Up to ₹5,00,000")).toBeInTheDocument();
+    expect(within(ladder).getByText("Up to ₹25,00,000")).toBeInTheDocument();
+    expect(within(ladder).getByText("MD / CEO")).toBeInTheDocument();
+    expect(within(ladder).getByText("No limit")).toBeInTheDocument();
+    expect(within(ladder).queryByText("District Manager")).not.toBeInTheDocument();
+  });
+
+  it("lets an administrator change the Regional Manager's industrial limit", async () => {
+    signInAs("admin");
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <ApprovalLimits />
+        <Toaster />
+      </>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Change the Regional Manager limit (Industrial order value, company-wide)",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Regional Manager's industrial order limit",
+    });
+    // Only the MD / CEO may have no limit.
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    const amount = within(dialog).getByLabelText("Limit in rupees");
+    await user.clear(amount);
+    await user.type(amount, "3000000");
+    await user.click(within(dialog).getByRole("button", { name: "Save limit" }));
+    expect(
+      await screen.findByText("Regional Manager's industrial order limit changed"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("It applies from the next industrial order.")).toBeInTheDocument();
+  });
+});

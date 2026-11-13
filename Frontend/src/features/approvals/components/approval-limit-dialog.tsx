@@ -58,6 +58,7 @@ const LIMIT_NAMES: Readonly<Record<ThresholdDocType, string>> = {
   sales_order: "order limit",
   quotation: "discount limit",
   complaint: "refund limit",
+  industrial_order: "industrial order limit",
 };
 
 /** APP-009 (live test M-03) · When a changed limit starts to count, in the limit's own words. */
@@ -69,6 +70,8 @@ function appliesFrom(docType: ThresholdDocType): string {
       return "It applies from the next discount request.";
     case "complaint":
       return "It applies from the next refund.";
+    case "industrial_order":
+      return "It applies from the next industrial order.";
   }
 }
 
@@ -77,6 +80,8 @@ function limitMeaning(target: LimitTarget): string {
   switch (target.docType) {
     case "sales_order":
       return "Orders up to this value, including GST, stop at this level.";
+    case "industrial_order":
+      return "Industrial orders up to this value, including GST, stop at this level.";
     case "complaint":
       return "Refunds up to this amount are approved at this level, then go to Accounts.";
     case "quotation":

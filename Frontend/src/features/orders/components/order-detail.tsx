@@ -34,7 +34,7 @@ import { GstChangeMark } from "@/features/quotations/components/gst-change-mark"
 import {
   TAX_TREATMENT_LABELS,
   formatRate,
-  freightLabel,
+  chargeTotalRows,
   parseWarnings,
 } from "@/features/quotations/lib/quotation-labels";
 import { RecordRatingsCard } from "@/features/ratings/components/record-ratings";
@@ -743,15 +743,11 @@ function TotalsBlock({ order }: { order: Order }): React.JSX.Element {
   const rows: { label: string; value: string; strong?: boolean }[] = [
     { label: "Gross", value: formatInr(totals.gross, { paise: true }) },
     { label: "Discount", value: formatDiscount(totals.discount) },
-    // QUOT-015 · Freight is taxed inside the taxable value, never in gross or discount.
-    ...(order.freight === null
-      ? []
-      : [
-          {
-            label: freightLabel(order.freight),
-            value: formatInr(order.freight.amount, { paise: true }),
-          },
-        ]),
+    // QUOT-015, QUOT-016 · Charges are taxed inside the taxable value, never in gross or discount.
+    ...chargeTotalRows(order).map((charge) => ({
+      label: charge.label,
+      value: formatInr(charge.amount, { paise: true }),
+    })),
     { label: "Taxable value", value: formatInr(totals.taxable, { paise: true }) },
     ...(order.intraState
       ? [

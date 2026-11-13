@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { ProductPick, QuotePreview } from "@/features/quotations/api/quotations.schemas";
 
 import {
+  chargeIssue,
+  chargesPresent,
+  chargesToSave,
+  draftChargesFrom,
   draftFreightFrom,
   draftLinesFrom,
-  freightIssue,
-  freightToSave,
+  NO_CHARGES,
   lineIssue,
   linesToSave,
   pricedByKey,
@@ -101,6 +104,8 @@ describe("[QUOT-004] pricing and saving", () => {
       gross: "1",
       discount: "0",
       freight: "0",
+      installation: "0",
+      fittings: "0",
       taxable: "1",
       cgst: "0",
       sgst: "0",
@@ -109,6 +114,8 @@ describe("[QUOT-004] pricing and saving", () => {
     },
     warnings: [],
     freight: null,
+    installation: null,
+    fittings: null,
     lines: [
       {
         lineNo: 1,
@@ -201,7 +208,7 @@ describe("[QUOT-004] routeSaveErrors", () => {
     ).toEqual({
       header: { partyMobile: "Not an Indian mobile number" },
       lines: { a: "Rate: now 108.35", b: "Quantity: nOS takes whole numbers" },
-      freight: null,
+      charges: { freight: null, installation: null, fittings: null },
     });
   });
 });
@@ -279,7 +286,7 @@ describe("[QUOT-015] a GST slab per line, and freight", () => {
 
   it("sends freight once it reads as rupees, with its slab only when picked", () => {
     const freight = (amount: string, gstSlab: string | null = null) =>
-      previewRequestFor([line("a")], COMMERCIAL, { amount, gstSlab });
+      previewRequestFor([line("a")], COMMERCIAL, { ...NO_CHARGES, freight: { amount, gstSlab } });
     expect(freight("").request).not.toHaveProperty("freight");
     expect(freight("12.345").request).not.toHaveProperty("freight");
     expect(freight("1500").request?.freight).toEqual({ amount: "1500" });
@@ -287,25 +294,22 @@ describe("[QUOT-015] a GST slab per line, and freight", () => {
       amount: "1500.5",
       gst_slab: "18",
     });
-    expect(freightToSave(freight("1500"))).toEqual({ amount: "1500" });
-    expect(freightToSave(freight(""))).toBeNull();
+    expect(chargesToSave(freight("1500")).freight).toEqual({ amount: "1500" });
+    expect(chargesToSave(freight("")).freight).toBeNull();
     expect(
       previewRequestFor(
         [line("a")],
         { ...CONTEXT, salesType: "subsidised" },
-        {
-          amount: "1500",
-          gstSlab: null,
-        },
+        { ...NO_CHARGES, freight: { amount: "1500", gstSlab: null } },
       ).request,
     ).not.toHaveProperty("freight");
   });
 
   it("says what's wrong with a freight amount", () => {
-    expect(freightIssue({ amount: "", gstSlab: null })).toBeNull();
-    expect(freightIssue({ amount: "99999999.99", gstSlab: null })).toBeNull();
+    expect(chargeIssue({ amount: "", gstSlab: null })).toBeNull();
+    expect(chargeIssue({ amount: "99999999.99", gstSlab: null })).toBeNull();
     for (const amount of ["0", "-5", "abc", "1.234", "100000000"]) {
-      expect(freightIssue({ amount, gstSlab: null })).toBe(
+      expect(chargeIssue({ amount, gstSlab: null })).toBe(
         "Rupees above 0, with at most two decimals",
       );
     }
@@ -323,11 +327,15 @@ describe("[QUOT-015] a GST slab per line, and freight", () => {
     ).toEqual({
       header: {},
       lines: { a: "GST: 28 % is not one of the GST slabs offered." },
-      freight: "Rupees above 0, with at most two decimals.",
+      charges: {
+        freight: "Rupees above 0, with at most two decimals.",
+        installation: null,
+        fittings: null,
+      },
     });
     expect(
       routeSaveErrors({ "freight.gst_slab": "12 % is not one of the GST slabs offered." }, [])
-        .freight,
+        .charges.freight,
     ).toBe("GST: 12 % is not one of the GST slabs offered.");
   });
 
@@ -346,6 +354,95 @@ describe("[QUOT-015] a GST slab per line, and freight", () => {
     expect(draftFreightFrom({ ...freight, gstSlabChosen: true })).toEqual({
       amount: "2000",
       gstSlab: "18",
+    });
+  });
+});
+
+describe("[QUOT-016] installation and fittings charges", () => {
+  const COMMERCIAL = { ...CONTEXT, salesType: "industrial" };
+  const charges = {
+    freight: { amount: "1500", gstSlab: null },
+    installation: { amount: "8000", gstSlab: null },
+    fittings: { amount: "2500.5", gstSlab: "12" },
+  };
+
+  it("sends each charge beside freight, with its slab only when picked", () => {
+    const plan = previewRequestFor([line("a")], COMMERCIAL, charges);
+    expect(plan.request).toMatchObject({
+      freight: { amount: "1500" },
+      installation: { amount: "8000" },
+      fittings: { amount: "2500.5", gst_slab: "12" },
+    });
+    expect(plan.request?.installation).not.toHaveProperty("gst_slab");
+    expect(chargesToSave(plan)).toEqual({
+      freight: { amount: "1500" },
+      installation: { amount: "8000" },
+      fittings: { amount: "2500.5", gst_slab: "12" },
+    });
+  });
+
+  it("sends no charge where the sale takes none, nor one still typed wrong", () => {
+    const subsidised = previewRequestFor(
+      [line("a")],
+      { ...CONTEXT, salesType: "subsidised" },
+      charges,
+    );
+    expect(subsidised.request).not.toHaveProperty("installation");
+    expect(subsidised.request).not.toHaveProperty("fittings");
+    const typo = previewRequestFor([line("a")], COMMERCIAL, {
+      ...NO_CHARGES,
+      installation: { amount: "80.001", gstSlab: null },
+    });
+    expect(typo.request).not.toHaveProperty("installation");
+    expect(chargeIssue({ amount: "80.001", gstSlab: null })).toBe(
+      "Rupees above 0, with at most two decimals",
+    );
+  });
+
+  it("creates with only the charges typed in, and an edit can remove one", () => {
+    const plan = previewRequestFor([line("a")], COMMERCIAL, {
+      ...NO_CHARGES,
+      installation: { amount: "8000", gstSlab: null },
+    });
+    expect(chargesPresent(chargesToSave(plan))).toEqual({ installation: { amount: "8000" } });
+    // A save of the lines sends null for the others, which removes them.
+    expect(chargesToSave(plan)).toEqual({
+      freight: null,
+      installation: { amount: "8000" },
+      fittings: null,
+    });
+  });
+
+  it("puts a refused charge on that charge", () => {
+    expect(
+      routeSaveErrors(
+        {
+          installation: "charge_not_allowed: installation is for commercial and industrial only",
+          "fittings.gst_slab": "12 % is not one of the GST slabs offered.",
+        },
+        [],
+      ).charges,
+    ).toEqual({
+      freight: null,
+      installation: "Installation is for commercial and industrial only",
+      fittings: "GST: 12 % is not one of the GST slabs offered.",
+    });
+  });
+
+  it("restores every charge of a saved draft", () => {
+    const saved = {
+      amount: "8000.00",
+      gstSlab: "18.000",
+      gstSlabChosen: false,
+      cgst: { rate: "9.000", amount: "720.00" },
+      sgst: { rate: "9.000", amount: "720.00" },
+      igst: { rate: "0.000", amount: "0.00" },
+      total: "9440.00",
+    };
+    expect(draftChargesFrom({ freight: null, installation: saved, fittings: null })).toEqual({
+      freight: { amount: "", gstSlab: null },
+      installation: { amount: "8000", gstSlab: null },
+      fittings: { amount: "", gstSlab: null },
     });
   });
 });

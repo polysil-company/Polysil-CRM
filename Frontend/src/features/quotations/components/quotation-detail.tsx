@@ -25,7 +25,7 @@ import {
   TAX_TREATMENT_LABELS,
   formatQuantity,
   formatRate,
-  freightLabel,
+  chargeTotalRows,
   parseWarnings,
   quotationTitle,
 } from "@/features/quotations/lib/quotation-labels";
@@ -593,15 +593,11 @@ function TotalsBlock({ quotation }: { quotation: Quotation }): React.JSX.Element
   const rows: { label: string; value: string; strong?: boolean }[] = [
     { label: "Gross", value: formatInr(totals.gross, { paise: true }) },
     { label: "Discount", value: formatDiscount(totals.discount) },
-    // QUOT-015 · Freight is taxed inside the taxable value, never in gross or discount.
-    ...(quotation.freight === null
-      ? []
-      : [
-          {
-            label: freightLabel(quotation.freight),
-            value: formatInr(quotation.freight.amount, { paise: true }),
-          },
-        ]),
+    // QUOT-015, QUOT-016 · Charges are taxed inside the taxable value, never in gross or discount.
+    ...chargeTotalRows(quotation).map((charge) => ({
+      label: charge.label,
+      value: formatInr(charge.amount, { paise: true }),
+    })),
     { label: "Taxable value", value: formatInr(totals.taxable, { paise: true }) },
     ...(quotation.intraState
       ? [

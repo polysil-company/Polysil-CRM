@@ -28,7 +28,7 @@ export function ForcedPasswordChange({ name }: { name: string }): React.JSX.Elem
           <h1 className="text-xl font-semibold text-foreground">Choose your own password</h1>
           <p className="text-sm text-muted-foreground">
             Welcome, {name}. Your administrator gave you a temporary password. Choose your own to
-            start using Polysil CRM; then sign in again with it.
+            start using Polysil Sarthi; then sign in again with it.
           </p>
         </header>
 
