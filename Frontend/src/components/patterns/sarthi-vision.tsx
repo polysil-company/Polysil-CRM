@@ -47,7 +47,8 @@ export function SarthiVision({
       <figcaption
         className={cn(
           "text-2xs font-semibold tracking-wider uppercase",
-          tone === "primary" ? "text-primary-foreground/80" : "text-primary-text",
+          // Full strength: small text on primary needs it for 4.5:1.
+          tone === "primary" ? "text-primary-foreground" : "text-primary-text",
         )}
       >
         Our vision

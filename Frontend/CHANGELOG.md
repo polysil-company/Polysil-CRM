@@ -225,6 +225,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
   - the ladder's order and bounds, and only the MD / CEO without a limit;
   - the screen shows the ladder, and an administrator changes the Regional Manager's limit.
 - `auth-frame.test.tsx`, `[APP-013]`: the name and tagline, and the vision card and panel, with spoken text for screen readers.
+- `sarthi-vision.stories.tsx`: the card and the brand panel pass Storybook's accessibility check. The small labels on the teal panel are full white, for 4.5:1 contrast.
 - By hand: sign-in in the browser at desktop and phone sizes, light and dark; screenshots are in `Docs/screenshots/auth/`.
 
 ## 11 November 2026

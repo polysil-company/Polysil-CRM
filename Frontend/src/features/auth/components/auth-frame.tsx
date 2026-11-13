@@ -54,7 +54,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }): React.JS
             className="size-40 shadow-lg ring-4 ring-primary-foreground/30 xl:size-48"
           />
           <div className="flex flex-col gap-2">
-            <p className="text-2xs font-medium tracking-wider text-primary-foreground/80 uppercase">
+            <p className="text-2xs font-medium tracking-wider text-primary-foreground uppercase">
               Polysil Irrigation
             </p>
             <p className="text-4xl font-semibold tracking-tight uppercase">{APP_NAME}</p>
