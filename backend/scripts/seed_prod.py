@@ -142,7 +142,11 @@ def main(argv: list[str] | None = None) -> int:
                                            ("regional_manager", None)]),
                           ("quotation", [("field_officer", "5"), ("district_manager", "10"),
                                          ("state_manager", "15"), ("regional_manager", "20"),
-                                         ("admin_sales", None)])):
+                                         ("admin_sales", None)]),
+                          # FS-089 (GAP-593); migration 090 inserts the same where roles exist
+                          ("industrial_order", [("state_manager", "500000"),
+                                                ("regional_manager", "2500000"),
+                                                ("md_ceo", None)])):
             for role, amount in rows:
                 cur.execute(
                     "INSERT INTO approval_threshold (doc_type, role_id, territory_id, max_amount) "
