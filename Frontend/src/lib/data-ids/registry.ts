@@ -571,6 +571,16 @@ export const DATA_IDS = {
     notes:
       "FS-088. Like freight (QUOT-015), printed as Transportation: installation defaults to 18%, fittings to the highest line slab. Codes charge_not_allowed, charge_without_lines, charge_amount_invalid.",
   },
+  "QUOT-017": {
+    domain: "QUOT",
+    title:
+      "An item or a document over the backend's money ceiling, said in rupees, with no figures left from before",
+    owner: "frontend",
+    status: "in-progress",
+    endpoints: ["POST /pricing/quote-lines"],
+    notes:
+      "line_total_too_large on the row, document_total_too_large above the totals. The ceiling itself is BE-044.",
+  },
   "SO-001": {
     domain: "SO",
     title: "Sales orders list",

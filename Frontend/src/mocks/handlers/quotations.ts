@@ -401,6 +401,9 @@ const partySchema = z.object({
   gstin: z.string().nullish(),
 });
 
+/** QUOT-017 · The backend's ceiling on a line and on a document, in rupees (BE-044). */
+const MAX_MOCK_TOTAL = 99_999_999.99;
+
 /**
  * Prices lines as the backend's preview does, or names the first field it refuses:
  * an unknown product, a quantity of zero or with more decimals than the unit takes, a
@@ -434,17 +437,26 @@ export function priceLines(
         ] = "between 0 and 100";
       }
     }
-    priced.push(
-      mockLine(
-        index + 1,
-        product,
-        line.qty,
-        discounts,
-        MOCK_PRODUCTS.indexOf(product) === PROVISIONAL_PRODUCT_INDEX,
-        mockDb.priceVersion,
-        chosenSlabOf(line),
-      ),
+    const pricedLine = mockLine(
+      index + 1,
+      product,
+      line.qty,
+      discounts,
+      MOCK_PRODUCTS.indexOf(product) === PROVISIONAL_PRODUCT_INDEX,
+      mockDb.priceVersion,
+      chosenSlabOf(line),
     );
+    // QUOT-017 · The backend's ceiling on one line (tax.py MAX_LINE_TOTAL), before discount.
+    if (Number(pricedLine.gross) > MAX_MOCK_TOTAL) {
+      fields[`lines[${String(index)}].qty`] =
+        `A line total may not exceed ${MAX_MOCK_TOTAL.toFixed(2)}; this one is ${pricedLine.gross}.`;
+    }
+    priced.push(pricedLine);
+  }
+  // QUOT-017 · And on the document's total (MAX_DOCUMENT_TOTAL), named on `lines`.
+  const total = priced.reduce((sum, line) => sum + Number(line.total), 0);
+  if (Object.keys(fields).length === 0 && total > MAX_MOCK_TOTAL) {
+    fields.lines = `A document total may not exceed ${MAX_MOCK_TOTAL.toFixed(2)}.`;
   }
   return Object.keys(fields).length > 0 ? { ok: false, fields } : { ok: true, lines: priced };
 }

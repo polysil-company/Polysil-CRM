@@ -209,6 +209,7 @@ describe("[QUOT-004] routeSaveErrors", () => {
       header: { partyMobile: "Not an Indian mobile number" },
       lines: { a: "Rate: now 108.35", b: "Quantity: nOS takes whole numbers" },
       charges: { freight: null, installation: null, fittings: null },
+      document: null,
     });
   });
 });
@@ -332,6 +333,7 @@ describe("[QUOT-015] a GST slab per line, and freight", () => {
         installation: null,
         fittings: null,
       },
+      document: null,
     });
     expect(
       routeSaveErrors({ "freight.gst_slab": "12 % is not one of the GST slabs offered." }, [])
@@ -444,5 +446,28 @@ describe("[QUOT-016] installation and fittings charges", () => {
       installation: { amount: "8000", gstSlab: null },
       fittings: { amount: "", gstSlab: null },
     });
+  });
+});
+
+describe("[QUOT-017] the backend's money ceilings, in rupees", () => {
+  it("names an item's value and the most one item can be, on that item", () => {
+    const routed = routeSaveErrors(
+      {
+        "lines[0].qty": "A line total may not exceed 99999999.99; this one is 148642260.00.",
+      },
+      ["a"],
+    );
+    expect(routed.lines.a).toBe(
+      "This item comes to ₹14,86,42,260.00 before discount; one item can be at most ₹9,99,99,999.99. Split it across items or documents.",
+    );
+    expect(routed.document).toBeNull();
+  });
+
+  it("puts a refusal of the whole document on the document", () => {
+    expect(
+      routeSaveErrors({ lines: "A document total may not exceed 99999999.99." }, ["a"]).document,
+    ).toBe(
+      "The total comes to more than ₹9,99,99,999.99, the most one quotation or order can be. Split it across documents.",
+    );
   });
 });
