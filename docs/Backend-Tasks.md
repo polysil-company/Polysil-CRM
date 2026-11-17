@@ -138,6 +138,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-043** · Which distributors a field officer can find when ordering · SO-012, SO-013 · high · **a decision**
 
+**From the client's report of 17 Nov**: a quotation of about ₹15 crore couldn't be priced
+
+- [ ] **BE-044** · Raise the ₹10 crore ceiling on one line and on a document · QUOT-004, QUOT-017, SO-005 · high
+
 ---
 
 ## Details
@@ -905,3 +909,19 @@ in the same shape. Never renumber or reuse a number.
     - A consolidated order (several leads) through such a distributor is refused, `partner_not_readable`, as before.
     - A distributor whose only dealers are registered for a whole state is not added (GAP-568, client question 38.1).
   - Field names are in `backend/docs/api/lookups.md`.
+
+### BE-044 · Raise the ₹10 crore ceiling on one line and on a document
+
+- **Status:** ⬜ Open
+- **Asked:** 17 Nov 2026 · QUOT-004, QUOT-017, SO-005 · the client's screenshot of quotation POL/GJ/2026-27/00013
+- **What:**
+  - `backend/api/domain/pricing/tax.py` sets `MAX_LINE_TOTAL` and `MAX_DOCUMENT_TOTAL` to `99999999.99`, just under ₹10 crore. A line's gross, or a document's total, above it is `422 line_total_too_large` or `document_total_too_large`.
+  - The client quoted 42,800 m of HDPE PE100 PN6 SDR21 DN315 at ₹3,472.95: **₹14,86,42,260** on one line before discount, with two more lines after it. The preview refuses it, so the quotation can't be saved at all.
+  - The comment calls these "Rule 11", a guard against overflow. The money columns are `numeric(14,2)`, which holds twelve digits before the point (up to ₹99,999 crore). So the guard, not the database, is what stops this quotation.
+  - Proposed: raise both to a figure the business can reach and the columns still hold with room for tax, such as `9999999999.99` (₹999 crore). Check every sum that adds a document's lines, taxes and charges, including order totals from several quotations and reports, against `numeric(14,2)`.
+  - Keep `MAX_QTY` (1,000,000) as it is, unless the client needs more.
+- **Why:** industrial and large project quotations run above ₹10 crore. Today the only way round is splitting one order into several documents.
+- **Done when:** a ₹15 crore line and a ₹50 crore document price, save, submit and print. The new ceilings are in `pricing.md`, `quotations.md` and `orders.md`.
+- **Done in:** —
+- **Backend notes:** —
+- **Frontend meanwhile (QUOT-017):** a refused line clears its old figures and says its value and the ceiling in rupees. A refused document says so above the totals.

@@ -10,6 +10,7 @@ import {
   type QuotePreview,
   type TaxTreatment,
 } from "@/features/quotations/api/quotations.schemas";
+import { formatInr } from "@/lib/format";
 
 /**
  * QUOT-004, QUOT-005 · The builder's lines, as pure functions: what the user is editing, what
@@ -368,6 +369,11 @@ export interface SaveErrors {
   readonly lines: Readonly<Record<string, string>>;
   /** QUOT-015, QUOT-016 · A refusal of each charge, its amount or its slab; null when none. */
   readonly charges: PerCharge<string | null>;
+  /**
+   * QUOT-017 · A refusal of the document as a whole (the backend's `lines` field), such as a
+   * total above the most one quotation or order can be; null when none.
+   */
+  readonly document: string | null;
 }
 
 const HEADER_FIELDS: Readonly<Record<string, string>> = {
@@ -397,6 +403,24 @@ function sentence(reason: string): string {
   return text === "" ? reason : `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
+/**
+ * QUOT-017 · The backend's money ceilings, in rupees the user reads (`line_total_too_large`,
+ * `document_total_too_large`). Null when the text is neither.
+ */
+function ceilingInWords(reason: string): string | null {
+  const line = /line total may not exceed (\d+(?:\.\d+)?); this one is (\d+(?:\.\d+)?)/i.exec(
+    reason,
+  );
+  if (line?.[1] !== undefined && line[2] !== undefined) {
+    return `This item comes to ${formatInr(line[2], { paise: true })} before discount; one item can be at most ${formatInr(line[1], { paise: true })}. Split it across items or documents.`;
+  }
+  const document = /document total may not exceed (\d+(?:\.\d+)?)/i.exec(reason);
+  if (document?.[1] !== undefined) {
+    return `The total comes to more than ${formatInr(document[1], { paise: true })}, the most one quotation or order can be. Split it across documents.`;
+  }
+  return null;
+}
+
 /** The backend's `fields` from a refused save or preview, placed on the header and the rows. */
 export function routeSaveErrors(
   fields: Readonly<Record<string, string>>,
@@ -409,8 +433,14 @@ export function routeSaveErrors(
     installation: null,
     fittings: null,
   };
+  let document: string | null = null;
   for (const [path, reason] of Object.entries(fields)) {
-    const text = sentence(reason);
+    const ceiling = ceilingInWords(reason);
+    const text = ceiling ?? sentence(reason);
+    if (path === "lines") {
+      document ??= text;
+      continue;
+    }
     const headerField = HEADER_FIELDS[path];
     if (headerField !== undefined) {
       header[headerField] = text;
@@ -435,10 +465,10 @@ export function routeSaveErrors(
               : field === "gst_slab"
                 ? "GST"
                 : "";
-      lines[key] ??= label === "" ? text : `${label}: ${lowerFirst(text)}`;
+      lines[key] ??= label === "" || ceiling !== null ? text : `${label}: ${lowerFirst(text)}`;
     }
   }
-  return { header, lines, charges };
+  return { header, lines, charges, document };
 }
 
 function lowerFirst(text: string): string {

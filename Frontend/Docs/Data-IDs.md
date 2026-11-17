@@ -207,6 +207,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | QUOT-014 | A subsidised quotation's subsidy, for one farmer category (`PUT /quotations/{id}/subsidy`, `GET /quotations/{id}/subsidy/calculation`) | shared | in-progress |
 | QUOT-015 | A GST slab per line, and freight, on a commercial or industrial quotation or order (`GET /pricing/gst-slabs`; `gst_slab` and `freight` on the preview, the saves and the lines) | shared | in-progress |
 | QUOT-016 | Installation and fittings material charges, each with its GST, on a commercial or industrial quotation or order (`installation` and `fittings` beside `freight`, FS-088) | shared | in-progress |
+| QUOT-017 | An item or a document over the backend's money ceiling, said in rupees, with no figures left from before (`line_total_too_large`, `document_total_too_large`) | frontend | in-progress |
 | SO-001 | Sales orders list (`GET /orders`) | shared | in-progress |
 | SO-002 | A sales order — the document, its approval chain, PDF and history (`GET /orders/{orderId}`, `GET /orders/{orderId}/pdf`, `GET /orders/{orderId}/timeline`) | shared | in-progress |
 | SO-003 | New order from accepted quotations, and a draft's header (`POST /orders`, `PATCH /orders/{orderId}`, `DELETE /orders/{orderId}`) | shared | in-progress |

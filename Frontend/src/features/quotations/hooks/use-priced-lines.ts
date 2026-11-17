@@ -79,6 +79,8 @@ export interface PricedLines {
   readonly previewErrors: Readonly<Record<string, string>>;
   /** The preview failed for a reason no row explains. */
   readonly previewFailed: boolean;
+  /** QUOT-017 · The preview refused the document as a whole, in words; null when it didn't. */
+  readonly documentError: string | null;
   readonly preview: UseQueryResult<QuotePreview>;
   readonly rowsWithIssues: number;
   readonly rowsReady: number;
@@ -202,7 +204,9 @@ export function usePricedLines(
     previewFailed:
       previewRefusal !== null &&
       Object.keys(previewErrors).length === 0 &&
-      CHARGE_KINDS.every((kind) => previewRefusal.charges[kind] === null),
+      CHARGE_KINDS.every((kind) => previewRefusal.charges[kind] === null) &&
+      previewRefusal.document === null,
+    documentError: previewRefusal?.document ?? null,
     preview,
     rowsWithIssues: lines.filter((line) => lineIssue(line) !== null).length,
     rowsReady,
