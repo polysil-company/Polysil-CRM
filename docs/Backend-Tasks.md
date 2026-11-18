@@ -140,7 +140,7 @@ in the same shape. Never renumber or reuse a number.
 
 **From the client's report of 17 Nov**: a quotation of about ₹15 crore couldn't be priced
 
-- [ ] **BE-044** · Raise the ₹10 crore ceiling on one line and on a document · QUOT-004, QUOT-017, SO-005 · high
+- [x] **BE-044** · Raise the ₹10 crore ceiling on one line and on a document · QUOT-004, QUOT-017, SO-005 · high
 
 ---
 
@@ -912,7 +912,7 @@ in the same shape. Never renumber or reuse a number.
 
 ### BE-044 · Raise the ₹10 crore ceiling on one line and on a document
 
-- **Status:** ⬜ Open
+- **Status:** ✅ Done
 - **Asked:** 17 Nov 2026 · QUOT-004, QUOT-017, SO-005 · the client's screenshot of quotation POL/GJ/2026-27/00013
 - **What:**
   - `backend/api/domain/pricing/tax.py` sets `MAX_LINE_TOTAL` and `MAX_DOCUMENT_TOTAL` to `99999999.99`, just under ₹10 crore. A line's gross, or a document's total, above it is `422 line_total_too_large` or `document_total_too_large`.
@@ -922,6 +922,12 @@ in the same shape. Never renumber or reuse a number.
   - Keep `MAX_QTY` (1,000,000) as it is, unless the client needs more.
 - **Why:** industrial and large project quotations run above ₹10 crore. Today the only way round is splitting one order into several documents.
 - **Done when:** a ₹15 crore line and a ₹50 crore document price, save, submit and print. The new ceilings are in `pricing.md`, `quotations.md` and `orders.md`.
-- **Done in:** —
-- **Backend notes:** —
+- **Done in:** branch `fix/be-044-ceiling` (FS-090, migration 091)
+- **Backend notes:**
+  - **Both ceilings are now 9,999,999,999.99** (just under ₹1,000 crore): `line_total_too_large`, `document_total_too_large`, and the charge codes (`freight_amount_invalid`, `charge_amount_invalid`). Same codes, same fields.
+  - **Please update QUOT-017's copy**, which states ₹9,99,99,999.99. Better: read the figure from the error message.
+  - The line ceiling is on gross, before tax. One line of ₹900 crore at 18 % is a legal line but a ₹1,062 crore document, so it returns `document_total_too_large` on `lines`.
+  - `MAX_QTY` stays 1,000,000.
+  - No pricing migration: the columns already held it. Migration 091 caps order reward points, which could overflow on a very large order and stop the dispatch.
+  - Both figures are our assumption (client question 44.1).
 - **Frontend meanwhile (QUOT-017):** a refused line clears its old figures and says its value and the ceiling in rupees. A refused document says so above the totals.

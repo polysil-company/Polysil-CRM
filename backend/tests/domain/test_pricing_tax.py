@@ -196,7 +196,7 @@ def test_the_quantity_bound_alone_does_not_bound_the_line_total() -> None:
 
 
 def test_the_document_total_is_bounded_too() -> None:
-    big = line("99999.99", "999", slab="5")
+    big = line("9999999.99", "999", slab="5")
     with pytest.raises(PricingError) as err:
         document_totals(tuple([big] * 20))
     assert err.value.code == "document_total_too_large"
@@ -235,21 +235,73 @@ def test_the_three_ceilings_are_the_figures_rule_11_names() -> None:
     accepted document (September).
     """
     assert D("1000000") == MAX_QTY
-    assert D("99999999.99") == MAX_LINE_TOTAL
-    assert D("99999999.99") == MAX_DOCUMENT_TOTAL
+    assert D("9999999999.99") == MAX_LINE_TOTAL
+    assert D("9999999999.99") == MAX_DOCUMENT_TOTAL
 
 
 def test_a_document_above_the_ceiling_is_refused_however_few_lines() -> None:
     """Two lines under the line ceiling can still break the document ceiling, and
     a zero slab is the case that gets there fastest."""
-    big = compute_line(rate=D("75000000.00"), qty=D("1"), discount_pct=ZERO, slab=D("0"),
+    big = compute_line(rate=D("7500000000.00"), qty=D("1"), discount_pct=ZERO, slab=D("0"),
                        intra_state=True)
-    assert big.total == D("75000000.00"), "each line is legal on its own"
+    assert big.total == D("7500000000.00"), "each line is legal on its own"
     with pytest.raises(PricingError) as err:
         document_totals((big, big))
     assert err.value.code == "document_total_too_large"
     assert err.value.field_path == "lines"
 
+
+
+# ── FS-090: the ₹1,000 crore ceiling (BE-044) ────────────────────────────────
+
+def test_the_clients_fifteen_crore_line_prices() -> None:
+    """Quotation POL/GJ/2026-27/00013, item 1: refused under the old ceiling."""
+    ln = line("3472.95", "42800", slab="18")
+    assert ln.gross == D("148642260.00")
+    t = document_totals((ln, line("3472.95", "1000", slab="18"), line("850.00", "500", slab="18")))
+    assert t.total > D("100000000")
+
+
+def test_a_fifty_crore_document_of_several_lines_prices() -> None:
+    lines = tuple(line("1000000.00", "100", slab="18") for _ in range(5))
+    assert document_totals(lines).taxable == D("500000000.00")
+
+
+def test_the_ceilings_hold_to_the_paisa() -> None:
+    """On the ceiling is allowed; one paisa over is refused, for a line and a document."""
+    ok = compute_line(rate=D("9999999999.99"), qty=D("1"), discount_pct=ZERO, slab=D("0"),
+                      intra_state=True)
+    assert document_totals((ok,)).total == MAX_DOCUMENT_TOTAL
+    with pytest.raises(PricingError) as err:
+        compute_line(rate=D("10000000000.00"), qty=D("1"), discount_pct=ZERO, slab=D("0"),
+                     intra_state=True)
+    assert err.value.code == "line_total_too_large"
+    half_a = compute_line(rate=D("5000000000.00"), qty=D("1"), discount_pct=ZERO, slab=D("0"),
+                          intra_state=True)
+    with pytest.raises(PricingError) as err:
+        document_totals((half_a, half_a))
+    assert err.value.code == "document_total_too_large"
+
+
+def test_one_big_taxed_line_is_refused_as_a_document_not_as_a_line() -> None:
+    """FS-090 edge case 6: the line ceiling is on gross before tax. ₹900 crore at
+    18 % is a legal line and a ₹1,062 crore document, so the code is the document's."""
+    big = line("9000000000.00", "1", slab="18")
+    with pytest.raises(PricingError) as err:
+        document_totals((big,))
+    assert (err.value.code, err.value.field_path) == ("document_total_too_large", "lines")
+
+
+@pytest.mark.parametrize("slab", ["0", "5", "18", "40"])
+@pytest.mark.parametrize("intra", [True, False])
+def test_the_largest_line_computes_exactly_at_every_slab(slab: str, intra: bool) -> None:
+    """No `InvalidOperation` at the widest figures: rate and quantity at their
+    bounds' product, three discount tiers."""
+    ln = compute_line(rate=D("9999.99"), qty=MAX_QTY, discounts=(D("10"), D("5"), D("2.5")),
+                      slab=D(slab), intra_state=intra)
+    assert ln.gross == D("9999990000.00")
+    assert ln.gross - ln.discount == ln.taxable
+    assert ln.total == ln.taxable + ln.cgst + ln.sgst + ln.igst
 
 def test_each_component_is_computed_at_half_the_rate_not_half_the_tax() -> None:
     """Rule 9, and the one mechanism the mutation check found untested.

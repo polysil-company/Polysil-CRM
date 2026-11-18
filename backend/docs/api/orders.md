@@ -842,7 +842,7 @@ and only the outcome to a dealer.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `amount` | number \| string | yes | Rupees before tax: above 0, at most two decimals, at most 99,999,999.99. Anything else is 422 freight_amount_invalid. |
+| `amount` | number \| string | yes | Rupees before tax: above 0, at most two decimals, at most 9,999,999,999.99. Anything else is 422 freight_amount_invalid. |
 | `gst_slab` | number \| string \| null |  | A slab from `GET /pricing/gst-slabs`. Omit for the default: the highest slab among the goods lines. |
 
 **`FreightOut`**

@@ -303,7 +303,7 @@ async def test_a_slab_dropped_from_the_list_stays_on_a_draft_that_holds_it(
         await s.commit()
 
 
-@pytest.mark.parametrize("amount", ["0", "-5", "10.555", "100000000.00"])
+@pytest.mark.parametrize("amount", ["0", "-5", "10.555", "10000000000.00"])
 async def test_a_bad_freight_amount_names_its_code(
         client: httpx.AsyncClient, quoter: Staff, qenv: QEnv, catalogue: Catalogue,
         amount: str) -> None:

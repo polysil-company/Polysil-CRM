@@ -14,7 +14,11 @@ import worker.jobs.orders as job
 from api.config import get_settings
 from api.domain.orders import pdf_filename, pdf_storage_key
 from tests.worker.test_quotation_render import _doc as _quotation_doc
-from tests.worker.test_quotation_render import _text, needs_weasyprint
+from tests.worker.test_quotation_render import (
+    _text,
+    assert_every_glyph_on_the_page,
+    needs_weasyprint,
+)
 from worker.jobs.quotations import render_pdf
 
 
@@ -166,3 +170,20 @@ def test_every_charge_is_a_row_of_its_own() -> None:
         < page.index("Fittings Material Charges")
     assert "₹1,000.00 90.00 (9%) 90.00 (9%) ₹1,180.00" in page
     assert "₹200.00 5.00 (2.5%) 5.00 (2.5%) ₹210.00" in page
+
+
+@needs_weasyprint
+def test_line_figures_at_the_ceiling_stay_on_the_order_page() -> None:
+    """FS-090: a line can now reach 9,999,999,999.99, which prints as 17 characters.
+    The order's columns hold it, with three charges beside it."""
+    doc = _doc()
+    for line in doc["lines"]:
+        line.update(rate="9999999999.99", gross="9999999999.99", taxable="9999999999.99",
+                    discount="9999999999.99", qty="1000000")
+    doc["order"].update(gross="9999999999.99", taxable="9999999999.99", total="9999999999.99",
+                        discount="9999999999.99", cgst="999999999.99", sgst="999999999.99",
+                        freight_amount="9999999999.99", freight_slab="18",
+                        freight_slab_chosen=False, freight_cgst="899999999.99",
+                        freight_sgst="899999999.99", freight_igst="0.00",
+                        freight_total="9999999999.99")
+    assert_every_glyph_on_the_page(render_pdf(job.render_html(doc)))

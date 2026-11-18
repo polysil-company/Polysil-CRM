@@ -158,6 +158,27 @@ async def test_a_delivered_order_earns_for_the_partner_and_the_staff_owner_and_a
     assert await _ledger(sessions, user=shop.ids["field_officer"]) == [("earned", staff_pts), ("reversed", -staff_pts)]
 
 
+
+async def test_points_past_int4_are_capped_so_the_dispatch_still_goes_through(
+        client: httpx.AsyncClient, shop: Shop, ruled: list[str], sessions: Sessions) -> None:
+    """091 (FS-090): 1,000,000 points per ₹0.01 on an ₹810 order is past int4. The cast
+    raised inside the dispatch trigger, so the dispatch could not be saved. Now
+    the earning takes the room left under int4, and a second rule finds none."""
+    await _rule(client, shop, ruled, holder="partner", points=1000000, per_amount="0.01")
+    await _rule(client, shop, ruled, holder="partner", points=1000000, per_amount="0.01")
+    order = await endpoints._approve_all(client, shop, await schemes._submit(
+        client, shop, (await schemes._order(client, shop, schemes._with_partner(shop)))["id"]))
+    await schemes._dispatch_all(client, shop, order)
+    assert (await schemes._get(client, shop, order["id"]))["status"] == "dispatched"
+    assert await _ledger(sessions, partner=shop.partner) == [("earned", domain.MAX_BALANCE)]
+    c = sessions()
+    try:
+        bal = (await c.execute(text("SELECT reward_balance('partner', CAST(:p AS uuid))"),
+                               {"p": shop.partner})).scalar_one()
+    finally:
+        await c.close()
+    assert bal == domain.MAX_BALANCE
+
 async def test_a_won_lead_earns_its_staff_owner_whoever_wins_it(
         shop: Shop, ruled: list[str], sessions: Sessions, client: httpx.AsyncClient) -> None:
     await _rule(client, shop, ruled, holder="staff", basis="lead_won", points=5, per_amount=None)

@@ -17,7 +17,6 @@ import pytest
 
 from api.domain.pricing.tax import (
     GST_SLABS,
-    MAX_DOCUMENT_TOTAL,
     MAX_LINE_TOTAL,
     compute_freight,
     compute_line,
@@ -136,7 +135,7 @@ def test_a_discount_share_is_unchanged_by_freight() -> None:
 
 
 def test_the_document_ceiling_counts_freight() -> None:
-    big = compute_line(rate=MAX_DOCUMENT_TOTAL - D("1000"), qty=D("1"), slab=D("0"),
+    big = compute_line(rate=MAX_LINE_TOTAL - D("1000"), qty=D("1"), slab=D("0"),
                        intra_state=True)
     document_totals((big,))
     with pytest.raises(PricingError) as e:
