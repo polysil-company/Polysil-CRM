@@ -447,35 +447,19 @@ def test_a_gujarati_name_and_hindi_terms_survive_the_text_layer() -> None:
     assert GUJARATI_NAME in text and HINDI_TERMS in text
 
 
-@needs_weasyprint
-def test_every_glyph_of_the_widest_page_lies_on_the_page() -> None:
-    """Cross-vendor A-3: text extraction passes even for text off the page, so
-    the positions are checked against the media box. The widest figure is the
-    document total over 200 lines at the line ceiling, and a description with no
-    space in it cannot push the amounts out (FS-064 edge case 10)."""
-    doc = _doc(lines=3)
-    for line in doc["lines"]:
-        line.update(rate="99999999.99", gross="99999999.99", taxable="99999999.99",
-                    discount="99999999.99", qty="1000000",
-                    description="HDPE-COIL-63MM-PE100-" + "X" * 179)
-    doc["quotation"].update(taxable="19999999998.00", total="19999999998.00",
-                            discount="19999999998.00", cgst="499999999.95", sgst="499999999.95")
-    doc["quotation"]["party_name"] = "N" * 200
-    # outside any table: the remark and the maker's name (F-5); and the longest
-    # category the masters hold, three times over (F-4)
-    doc["quotation"]["terms"] = "T" * 200
-    doc["print"].update(village="V" * 120, dealer_name="D" * 200, made_by="M" * 200)
-    doc["subsidy"] = {"scheme_code": "GJ", "category_name": "SC+ST(TRIBAL)+DarkZone90%" * 4,
-                      "total_cost": "19999999998.00", "flat_charge": 1003,
-                      "subsidy": "19999999998.00", "farmer_share": "19999999998.00"}
-    reader = pypdf.PdfReader(io.BytesIO(render_pdf(render_html(doc))))
+def assert_every_glyph_on_the_page(data: bytes, only: re.Pattern[str] | None = None) -> None:
+    """Each text run's estimated end lies inside its page's media box. Shared
+    with the order PDF's test (FS-090: line figures at the ₹1,000 crore ceiling).
+    `only` limits the check to runs it matches: the estimate is a floor for
+    digits, and overstates a wrapped line of prose, which cannot overrun."""
+    reader = pypdf.PdfReader(io.BytesIO(data))
     for page in reader.pages:
         width = float(page.mediabox.width)
         ends: list[tuple[float, str]] = []
 
         def visit(text: str, cm: list, tm: list, _font: object, size: float,
                   ends: list[tuple[float, str]] = ends) -> None:
-            if not text.strip():
+            if not text.strip() or (only is not None and not only.search(text)):
                 return
             scale = cm[0] * tm[0] or 1.0
             start = cm[4] + tm[4] * cm[0]
@@ -488,6 +472,30 @@ def test_every_glyph_of_the_widest_page_lies_on_the_page() -> None:
         assert ends, "no text on the page"
         widest = max(ends)
         assert widest[0] <= width, (widest, width)
+
+
+@needs_weasyprint
+def test_every_glyph_of_the_widest_page_lies_on_the_page() -> None:
+    """Cross-vendor A-3: text extraction passes even for text off the page, so
+    the positions are checked against the media box. The widest figure is the
+    document total over 200 lines at the line ceiling, and a description with no
+    space in it cannot push the amounts out (FS-064 edge case 10)."""
+    doc = _doc(lines=3)
+    for line in doc["lines"]:
+        line.update(rate="9999999999.99", gross="9999999999.99", taxable="9999999999.99",
+                    discount="9999999999.99", qty="1000000",
+                    description="HDPE-COIL-63MM-PE100-" + "X" * 179)
+    doc["quotation"].update(taxable="19999999998.00", total="19999999998.00",
+                            discount="19999999998.00", cgst="499999999.95", sgst="499999999.95")
+    doc["quotation"]["party_name"] = "N" * 200
+    # outside any table: the remark and the maker's name (F-5); and the longest
+    # category the masters hold, three times over (F-4)
+    doc["quotation"]["terms"] = "T" * 200
+    doc["print"].update(village="V" * 120, dealer_name="D" * 200, made_by="M" * 200)
+    doc["subsidy"] = {"scheme_code": "GJ", "category_name": "SC+ST(TRIBAL)+DarkZone90%" * 4,
+                      "total_cost": "19999999998.00", "flat_charge": 1003,
+                      "subsidy": "19999999998.00", "farmer_share": "19999999998.00"}
+    assert_every_glyph_on_the_page(render_pdf(render_html(doc)))
 
 
 @needs_weasyprint

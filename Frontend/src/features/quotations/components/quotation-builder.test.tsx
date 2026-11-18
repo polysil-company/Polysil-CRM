@@ -614,3 +614,68 @@ describe("[APP-009] The builder after the live test (I-03, I-05, Y-03)", () => {
     expect(await within(totals).findByText("Transportation", {}, PRICED)).toBeInTheDocument();
   });
 });
+
+describe("[QUOT-017] An item or a document over the backend's ceiling", () => {
+  afterEach(() => {
+    push.mockReset();
+    resetMockDb();
+  });
+
+  it(
+    "says the item's value in rupees, and clears the figures it had for a smaller quantity",
+    PRICING_TEST,
+    async () => {
+      signInAsAdmin();
+      const user = showNew(leadAt("qualified"));
+      await screen.findByRole("form", { name: "New quotation" });
+      await addPipe(user, "10");
+      const item = screen.getByRole("listitem", { name: "Item 1" });
+      expect(await within(item).findByText("Rate", {}, PRICED)).toBeInTheDocument();
+
+      // 1,000,000 m at ₹103.19 is over ₹10 crore.
+      await user.type(within(item).getByLabelText("Quantity"), "00000");
+      expect(
+        await within(item).findByText(
+          /^This item comes to ₹10,31,90,000\.00 before discount; one item can be at most ₹9,99,99,999\.99\./,
+          {},
+          PRICED,
+        ),
+      ).toBeInTheDocument();
+      // The ₹1,031.90 figures of 10 m are gone, not left beside the refusal.
+      expect(within(item).queryByText("Rate")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+      expect(screen.getByText("Fix the pricing first.")).toBeInTheDocument();
+    },
+  );
+
+  it("says when the whole quotation is over the ceiling, without a Price again", async () => {
+    signInAsAdmin();
+    server.use(
+      http.post(buildApiUrl("/pricing/quote-lines"), () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "document_total_too_large",
+              message: "A document total may not exceed 99999999.99.",
+              fields: { lines: "A document total may not exceed 99999999.99." },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = showNew(leadAt("qualified"));
+    await screen.findByRole("form", { name: "New quotation" });
+    await addPipe(user, "10");
+
+    expect(
+      await screen.findByText(
+        "The total comes to more than ₹9,99,99,999.99, the most one quotation or order can be. Split it across documents.",
+        {},
+        PRICED,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Price again" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+  });
+});

@@ -365,6 +365,11 @@ export function QuotationBuilder({ source }: { source: BuilderSource }): React.J
           setFormError(null);
           return;
         }
+        // QUOT-017 · The document as a whole was refused, such as a total over the ceiling.
+        if (routed.document !== null) {
+          setFormError({ title: "The total is over the limit", description: routed.document });
+          return;
+        }
         {
           const view = toUserFacingError(error);
           setFormError({

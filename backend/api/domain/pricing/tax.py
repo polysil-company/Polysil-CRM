@@ -63,11 +63,14 @@ GST_SLABS: tuple[Decimal, ...] = tuple(Decimal(s) for s in
 # quantity of 1E+26 makes `round2` raise `InvalidOperation` inside this module,
 # and 1E+20 previews cleanly and then overflows the column at save.
 MAX_QTY = Decimal("1000000")
-MAX_LINE_TOTAL = Decimal("99999999.99")
-# Rule 11 sets the document ceiling to the line ceiling, and this constant was ten
-# times larger: two zero-rated 75,000,000 lines were accepted as a 150,000,000
+# FS-090 raised both from 99,999,999.99: an industrial line ran to ₹14.86 crore
+# (BE-044). numeric(14,2) holds 999,999,999,999.99, so the largest line total, at
+# 40 % GST, still fits. The figure is an assumption (GAP-596).
+MAX_LINE_TOTAL = Decimal("9999999999.99")
+# Rule 11 sets the document ceiling to the line ceiling, and this constant was once
+# ten times larger: two zero-rated 75,000,000 lines were accepted as a 150,000,000
 # document (cross-vendor review, September).
-MAX_DOCUMENT_TOTAL = Decimal("99999999.99")
+MAX_DOCUMENT_TOTAL = Decimal("9999999999.99")
 # FS-005 rule 6: the client's format has three discount columns, not n.
 MAX_TIERS = 3
 

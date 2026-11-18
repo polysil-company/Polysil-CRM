@@ -70,7 +70,13 @@ export function PricedItemsCard({
               key={line.key}
               line={line}
               index={index}
-              priced={priced.priced.get(line.key)}
+              // QUOT-017 · A row the preview refused shows no figures: the last ones it had were
+              // for something else, such as a quantity half typed.
+              priced={
+                priced.previewErrors[line.key] === undefined
+                  ? priced.priced.get(line.key)
+                  : undefined
+              }
               pricing={priced.pricing}
               error={priced.lineErrors[line.key] ?? priced.previewErrors[line.key]}
               canRemove={priced.lines.length > 1 || line.product !== null || line.qty !== ""}
@@ -250,6 +256,11 @@ export function PricedSummary({ priced }: { priced: PricedLines }): React.JSX.El
         intraState={priced.snapshot?.preview.intraState ?? true}
         stale={priced.pricing}
       />
+      {priced.documentError === null ? null : (
+        <p role="alert" className="rounded-md bg-danger-soft p-3 text-sm text-danger">
+          {priced.documentError}
+        </p>
+      )}
       {priced.previewFailed ? (
         <div role="alert" className="flex flex-col gap-2 rounded-md bg-danger-soft p-3 text-sm">
           <p className="font-medium text-danger">{toUserFacingError(priced.preview.error).title}</p>
@@ -284,7 +295,11 @@ export function saveBlocker(priced: PricedLines): string | null {
     return `Finish ${priced.rowsWithIssues === 1 ? "one item" : `${String(priced.rowsWithIssues)} items`} first.`;
   }
   if (priced.pricing) return "Pricing…";
-  if (priced.previewFailed || Object.keys(priced.previewErrors).length > 0) {
+  if (
+    priced.previewFailed ||
+    priced.documentError !== null ||
+    Object.keys(priced.previewErrors).length > 0
+  ) {
     return "Fix the pricing first.";
   }
   if (priced.chargesBlock) return "Fix the other charges first.";
