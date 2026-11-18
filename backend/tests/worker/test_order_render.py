@@ -187,3 +187,13 @@ def test_line_figures_at_the_ceiling_stay_on_the_order_page() -> None:
                         freight_sgst="899999999.99", freight_igst="0.00",
                         freight_total="9999999999.99")
     assert_every_glyph_on_the_page(render_pdf(job.render_html(doc)))
+
+
+def test_only_an_order_above_ten_crore_prints_the_dense_table() -> None:
+    """FS-090: the order PDF keeps its usual face up to ₹9,99,99,999.99."""
+    doc = _doc()
+    assert 'class="dense"' not in job.render_html(doc)
+    doc["order"].update(gross="99999999.99", total="99999999.99")
+    assert 'class="dense"' not in job.render_html(doc)
+    doc["order"].update(total="100000000.00")
+    assert 'class="dense"' in job.render_html(doc)
