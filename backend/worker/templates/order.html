@@ -28,6 +28,11 @@
   td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   th.n { text-align: right; }
   tfoot td { font-weight: 600; }
+  /* FS-090: above ₹10 crore a figure has 17 characters, and ten of them do not fit
+     A4 landscape at 7.5pt. A smaller face, and a figure may wrap inside its cell. */
+  table.dense { font-size: 6.5pt; }
+  table.dense th, table.dense td { padding: 0.6mm 0.7mm; }
+  table.dense td.n, table.dense th.n { white-space: normal; overflow-wrap: anywhere; }
   .terms { margin-top: 6mm; white-space: pre-wrap; }
   .foot { margin-top: 10mm; font-size: 8.5pt; color: #555; }
 </style>
@@ -65,7 +70,8 @@
     </div>
   </div>
 
-  <table>
+  {% set dense = [o.gross, o.total] | map('money') | map('length') | max > 14 %}
+  <table{% if dense %} class="dense"{% endif %}>
     <thead>
       <tr>
         <th>#</th><th>Product</th><th>HSN</th><th>Unit</th>

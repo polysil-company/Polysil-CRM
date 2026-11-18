@@ -48,7 +48,7 @@ def test_freight_keeps_its_own_codes() -> None:
     assert exc.value.code == "freight_amount_invalid"
 
 
-@pytest.mark.parametrize("amount", ["0.00", "-1.00", "1.005", "100000000.00"])
+@pytest.mark.parametrize("amount", ["0.00", "-1.00", "1.005", "10000000000.00"])
 def test_a_bad_amount_names_the_charge(amount: str) -> None:
     with pytest.raises(PricingError) as exc:
         charge("fittings", amount, "18")

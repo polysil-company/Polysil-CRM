@@ -323,7 +323,7 @@ class FreightIn(BaseModel):
     amount: Annotated[Decimal, Field(
         allow_inf_nan=False,
         description="Rupees before tax: above 0, at most two decimals, at most "
-                    "99,999,999.99. Anything else is 422 freight_amount_invalid.")]
+                    "9,999,999,999.99. Anything else is 422 freight_amount_invalid.")]
     gst_slab: Annotated[Decimal | None, Field(
         default=None, ge=0, le=100,
         description="A slab from `GET /pricing/gst-slabs`. Omit for the default: the "

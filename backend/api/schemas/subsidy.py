@@ -29,8 +29,9 @@ MAX_CROPS = 10
 # A bound on every decimal field, checked before anything quantizes it. A rate of
 # 1E26 is finite and passes `gt=0`, and quantizing it exceeds the default decimal
 # context: `InvalidOperation` escapes as a 500 where the contract promises a
-# field-level 422 (cross-vendor review, September). The figure is the same
-# ceiling the pricing engine applies to a line total.
+# field-level 422 (cross-vendor review, September). The figure was the pricing
+# engine's line ceiling until FS-090 raised that one. This stays at farmer scale on
+# purpose: no drip or sprinkler figure comes near it.
 MAX_MAGNITUDE = Decimal("99999999.99")
 
 

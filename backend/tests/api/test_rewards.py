@@ -158,6 +158,58 @@ async def test_a_delivered_order_earns_for_the_partner_and_the_staff_owner_and_a
     assert await _ledger(sessions, user=shop.ids["field_officer"]) == [("earned", staff_pts), ("reversed", -staff_pts)]
 
 
+
+async def _saturating_order(client: httpx.AsyncClient, shop: Shop) -> dict[str, Any]:
+    order = await endpoints._approve_all(client, shop, await schemes._submit(
+        client, shop, (await schemes._order(client, shop, schemes._with_partner(shop)))["id"]))
+    await schemes._dispatch_all(client, shop, order)
+    assert (await schemes._get(client, shop, order["id"]))["status"] == "dispatched"
+    return order
+
+
+async def _balance(sessions: Sessions, holder_type: str, holder: str) -> int:
+    c = sessions()
+    try:
+        return int((await c.execute(text("SELECT reward_balance(:t, CAST(:h AS uuid))"),
+                                    {"t": holder_type, "h": holder})).scalar_one())
+    finally:
+        await c.close()
+
+
+async def test_points_past_int4_are_capped_so_the_dispatch_still_goes_through(
+        client: httpx.AsyncClient, shop: Shop, ruled: list[str], sessions: Sessions) -> None:
+    """091 (FS-090): 1,000,000 points per ₹0.01 on an ₹810 order is past int4. The cast
+    raised inside the dispatch trigger, so the dispatch could not be saved. Now the
+    earning takes the room left under the cap, and a second rule finds none."""
+    await _rule(client, shop, ruled, holder="partner", points=1000000, per_amount="0.01")
+    await _rule(client, shop, ruled, holder="partner", points=1000000, per_amount="0.01")
+    await _saturating_order(client, shop)
+    assert await _ledger(sessions, partner=shop.partner) == [("earned", domain.MAX_BALANCE)]
+    assert await _balance(sessions, "partner", shop.partner) == domain.MAX_BALANCE
+
+
+async def test_a_negative_balance_does_not_widen_the_room(
+        client: httpx.AsyncClient, shop: Shop, ruled: list[str], sessions: Sessions) -> None:
+    """Code review F-1: a balance below zero made the room larger than int4, and the
+    cast raised again. A negative balance counts as zero."""
+    await _give(sessions, shop, -1000)
+    await _rule(client, shop, ruled, holder="partner", points=1000000, per_amount="0.01")
+    await _saturating_order(client, shop)
+    assert await _ledger(sessions, partner=shop.partner) == [
+        ("adjusted", -1000), ("earned", domain.MAX_BALANCE)]
+    assert await _balance(sessions, "partner", shop.partner) == domain.MAX_BALANCE - 1000
+
+
+async def test_a_staff_owners_room_is_their_own(
+        client: httpx.AsyncClient, shop: Shop, ruled: list[str], sessions: Sessions) -> None:
+    """Code review F-5: the staff branch reads the owner's rows, not the partner's."""
+    await _give(sessions, shop, 500)
+    await _rule(client, shop, ruled, holder="staff", points=1000000, per_amount="0.01")
+    await _saturating_order(client, shop)
+    assert await _ledger(sessions, user=shop.ids["field_officer"]) == [("earned", domain.MAX_BALANCE)]
+    assert await _balance(sessions, "partner", shop.partner) == 500
+
+
 async def test_a_won_lead_earns_its_staff_owner_whoever_wins_it(
         shop: Shop, ruled: list[str], sessions: Sessions, client: httpx.AsyncClient) -> None:
     await _rule(client, shop, ruled, holder="staff", basis="lead_won", points=5, per_amount=None)
