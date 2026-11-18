@@ -41,9 +41,13 @@ def test_a_point_is_never_spent_for_less_than_its_value() -> None:
         assert room - amount < D("1.25")
 
 
-def test_points_never_take_a_balance_past_int4() -> None:
-    """091's cap, mirrored: the room left, never more, never negative from earnings."""
-    assert domain.points_for(Decimal("10000000000"), Decimal("1"), 1) == domain.MAX_BALANCE
-    assert domain.points_for(Decimal("10000000000"), Decimal("1"), 1,
-                             balance=domain.MAX_BALANCE - 5) == 5
+def test_points_never_take_a_balance_past_the_cap() -> None:
+    """091's cap, mirrored: the room left, never more, never below zero, and a
+    negative balance counted as zero (code review F-1)."""
+    big = Decimal("10000000000")
+    assert domain.points_for(big, Decimal("1"), 1) == domain.MAX_BALANCE
+    assert domain.points_for(big, Decimal("1"), 1, balance=domain.MAX_BALANCE - 5) == 5
+    assert domain.points_for(big, Decimal("1"), 1, balance=domain.MAX_BALANCE + 5) == 0
+    assert domain.points_for(big, Decimal("1"), 1, balance=-1000) == domain.MAX_BALANCE
     assert domain.points_for(Decimal("1000"), Decimal("100"), 2, balance=10) == 20
+    assert domain.MAX_BALANCE + 1_000_000_000 < 2_147_483_647, "headroom under int4"

@@ -172,21 +172,26 @@ def test_every_charge_is_a_row_of_its_own() -> None:
     assert "₹200.00 5.00 (2.5%) 5.00 (2.5%) ₹210.00" in page
 
 
+W = "9999999999.99"   # FS-090's line ceiling, 17 characters printed
+T = "999999999.99"    # a tax figure at a tenth of it
+
+
 @needs_weasyprint
-def test_line_figures_at_the_ceiling_stay_on_the_order_page() -> None:
-    """FS-090: a line can now reach 9,999,999,999.99, which prints as 17 characters.
-    The order's columns hold it, with three charges beside it."""
-    doc = _doc()
+@pytest.mark.parametrize("intra", [True, False])
+def test_line_figures_at_the_ceiling_stay_on_the_order_page(intra: bool) -> None:
+    """FS-090: every money column of every line at the ceiling, all three discount
+    tiers printed, freight beside it, intra and inter state."""
+    doc = _doc(intra=intra)
     for line in doc["lines"]:
-        line.update(rate="9999999999.99", gross="9999999999.99", taxable="9999999999.99",
-                    discount="9999999999.99", qty="1000000")
-    doc["order"].update(gross="9999999999.99", taxable="9999999999.99", total="9999999999.99",
-                        discount="9999999999.99", cgst="999999999.99", sgst="999999999.99",
-                        freight_amount="9999999999.99", freight_slab="18",
-                        freight_slab_chosen=False, freight_cgst="899999999.99",
-                        freight_sgst="899999999.99", freight_igst="0.00",
-                        freight_total="9999999999.99")
-    assert_every_glyph_on_the_page(render_pdf(job.render_html(doc)))
+        line.update(rate=W, gross=W, discount1_amt=W, after_discount1=W, discount2_amt=W,
+                    after_discount2=W, discount3_pct="2.500", discount3_amt=W, discount=W,
+                    taxable=W, cgst=T, sgst=T, igst=T, total=W, qty="1000000")
+    doc["order"].update(gross=W, taxable=W, total=W, discount=W, cgst=T, sgst=T, igst=T,
+                        freight_amount=W, freight_slab="18", freight_slab_chosen=False,
+                        freight_cgst=T, freight_sgst=T, freight_igst=T, freight_total=W)
+    html = job.render_html(doc)
+    assert 'class="dense"' in html and "3rd disc" in html
+    assert_every_glyph_on_the_page(render_pdf(html))
 
 
 def test_only_an_order_above_ten_crore_prints_the_dense_table() -> None:

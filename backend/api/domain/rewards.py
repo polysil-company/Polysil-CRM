@@ -26,18 +26,19 @@ SQLSTATE_TO_ERROR: dict[str, tuple[int, str]] = {
 }
 
 
-# reward_ledger.points is int4. 091: an earning takes at most the room left under it.
-MAX_BALANCE = 2_147_483_647
+# reward_ledger.points is int4. 091 caps order earnings here, leaving headroom
+# under int4 for scheme points, releases and adjustments.
+MAX_BALANCE = 1_000_000_000
 
 
 def points_for(value: Decimal, per_amount: Decimal, points: int, balance: int = 0) -> int:
     """Rule 2: whole blocks of `per_amount` in the value, times the points. Never a
-    fraction of a point. Mirrors 091: never past `MAX_BALANCE` with the holder's
-    `balance` (GAP-597)."""
+    fraction of a point. Mirrors 091: at most the room left under `MAX_BALANCE`,
+    a negative balance counted as zero, never below zero (GAP-597)."""
     if value <= 0 or per_amount <= 0:
         return 0
     blocks = (value / per_amount).to_integral_value(rounding=ROUND_FLOOR)
-    return min(int(blocks) * points, MAX_BALANCE - balance)
+    return max(0, min(int(blocks) * points, MAX_BALANCE - max(0, balance)))
 
 
 def redemption_split(points: int, point_value: Decimal, payable_left: Decimal,
