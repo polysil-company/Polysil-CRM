@@ -1,0 +1,99 @@
+# A nightly look at integration for problems that don't arrive through a code change:
+# every check for every app, plus a dependency audit.
+#
+# GitHub runs scheduled workflows from the default branch (main) only, so this file
+# takes effect once it reaches main. It checks out integration explicitly, and skips
+# the night when integration hasn't changed in the last day. See docs/CI-CD.md.
+
+name: Nightly
+
+on:
+  schedule:
+    # 02:00 India Standard Time (20:30 UTC).
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-changed:
+    name: Integration changed in the last day
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: integration
+
+      - name: Compare the latest commit time with now
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          last_commit=$(git log -1 --format=%ct)
+          age_hours=$(( ($(date +%s) - last_commit) / 3600 ))
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$age_hours" -lt 25 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Checking integration. Its latest commit is ${age_hours} hours old."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Integration hasn't changed for ${age_hours} hours. Nothing to check tonight."
+          fi
+
+  checks:
+    name: Checks
+    needs: integration-changed
+    if: needs.integration-changed.outputs.changed == 'true'
+    uses: ./.github/workflows/checks.yml
+    with:
+      scope: all
+      slow-suites: true
+      ref: integration
+
+  frontend-audit:
+    name: "Frontend: dependency audit"
+    needs: integration-changed
+    if: needs.integration-changed.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: integration
+
+      - name: Audit runtime dependencies for high and critical advisories
+        run: |
+          if [ ! -f Frontend/package-lock.json ]; then
+            echo "There is no frontend on integration yet."
+            exit 0
+          fi
+          cd Frontend
+          npm audit --omit=dev --audit-level=high
+
+  alert:
+    name: Alert while nightly checks fail
+    needs: [integration-changed, checks, frontend-audit]
+    if: always() && needs.integration-changed.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+
+      - uses: ./.github/actions/alert
+        with:
+          title: "CI: nightly checks are failing on integration"
+          result: ${{ contains(needs.*.result, 'failure') && 'failure' || (contains(needs.*.result, 'cancelled') && 'cancelled' || 'success') }}
+          commit: ${{ needs.integration-changed.outputs.sha }}
+          summary: >-
+            The nightly run found a failing check or a high-severity dependency advisory
+            on `integration`.

@@ -1,0 +1,27 @@
+# Duty · Go on duty: the server starts it and the phone starts recording.
+# Writes a real duty for the signed-in account: use a test account or the test site.
+appId: com.polysil.crm
+tags: [duty]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Duty"
+- runFlow:
+    when:
+      visible: "Go on duty"
+    commands:
+      - tapOn: "Go on duty"
+- extendedWaitUntil:
+    visible: "On duty since .*"
+    timeout: 45000
+- assertVisible: "Go off duty"
+- takeScreenshot: 05-on-duty
+# Leave the app in the background with the screen off: the tester waits 10 minutes, walking or
+# with a mock location route, then runs 06.
+- pressKey: Home
