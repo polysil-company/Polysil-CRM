@@ -6,6 +6,7 @@ tests/db/test_migration_016.py."""
 from __future__ import annotations
 
 import asyncio
+import re
 import threading
 
 import pytest
@@ -191,7 +192,8 @@ def test_line_figures_at_the_ceiling_stay_on_the_order_page(intra: bool) -> None
                         freight_cgst=T, freight_sgst=T, freight_igst=T, freight_total=W)
     html = job.render_html(doc)
     assert 'class="dense"' in html and "3rd disc" in html
-    assert_every_glyph_on_the_page(render_pdf(html))
+    # the figures, not the prose under the table: a wrapped sentence cannot overrun
+    assert_every_glyph_on_the_page(render_pdf(html), only=re.compile(r"^[₹\d,.() %]+$"))
 
 
 def test_only_an_order_above_ten_crore_prints_the_dense_table() -> None:

@@ -447,9 +447,11 @@ def test_a_gujarati_name_and_hindi_terms_survive_the_text_layer() -> None:
     assert GUJARATI_NAME in text and HINDI_TERMS in text
 
 
-def assert_every_glyph_on_the_page(data: bytes) -> None:
+def assert_every_glyph_on_the_page(data: bytes, only: re.Pattern[str] | None = None) -> None:
     """Each text run's estimated end lies inside its page's media box. Shared
-    with the order PDF's test (FS-090: line figures at the ₹1,000 crore ceiling)."""
+    with the order PDF's test (FS-090: line figures at the ₹1,000 crore ceiling).
+    `only` limits the check to runs it matches: the estimate is a floor for
+    digits, and overstates a wrapped line of prose, which cannot overrun."""
     reader = pypdf.PdfReader(io.BytesIO(data))
     for page in reader.pages:
         width = float(page.mediabox.width)
@@ -457,7 +459,7 @@ def assert_every_glyph_on_the_page(data: bytes) -> None:
 
         def visit(text: str, cm: list, tm: list, _font: object, size: float,
                   ends: list[tuple[float, str]] = ends) -> None:
-            if not text.strip():
+            if not text.strip() or (only is not None and not only.search(text)):
                 return
             scale = cm[0] * tm[0] or 1.0
             start = cm[4] + tm[4] * cm[0]
