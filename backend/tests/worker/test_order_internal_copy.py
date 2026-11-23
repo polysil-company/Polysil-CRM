@@ -268,4 +268,5 @@ def test_every_page_of_the_internal_copy_says_so_and_a_long_remark_stays_on_it()
     # pypdf spaces a margin box's runs as it likes ("customer ."), so compare without them
     for i, text in enumerate(pages):
         assert "Internalcopy.Notforthecustomer." in re.sub(r"\s+", "", text), f"page {i + 1}"
-    assert_every_glyph_on_the_page(data, only=re.compile(r"^X+$"))
+    assert_every_glyph_on_the_page(data, only=re.compile(r"^X+$"), every_page=False)
+    assert sum("XXXXXXXXXX" in t for t in pages) >= 2, "the long remarks were printed"
