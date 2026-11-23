@@ -700,6 +700,10 @@ async def get_order(db: AsyncSession, caller: Caller, order_id: str) -> sch.Orde
         warnings=_warnings(r, lines) + subsidy_warnings,
         pdf_state=("pending" if r.pdf_state == "rendering" else r.pdf_state or "none"),
         pdf_error=None if portal else r.pdf_error,
+        pdf_internal_state=None if portal else domain.internal_pdf_state(
+            r.pdf_state, r.pdf_internal_key, r.pdf_internal_attempts,
+            leased=r.pdf_lease_until is not None and r.pdf_lease_until > dt.datetime.now(dt.UTC),
+            cancelled=r.status_text == "cancelled"),
         confirmation=(await db.execute(text(
             "SELECT payload->>'confirmation' FROM activity_event WHERE entity_type = 'sales_order' "
             "AND entity_id = CAST(:o AS uuid) AND kind = 'order.approved' "
@@ -1688,11 +1692,17 @@ __all__ = ["ApiError", "cancel_order", "close_short", "create_order", "delete_or
 
 # ── the order PDF (FS-012) ───────────────────────────────────────────────────
 
-async def pdf_link(db: AsyncSession, caller: Caller, order_id: str, storage: Storage) -> PdfLink:
+async def pdf_link(db: AsyncSession, caller: Caller, order_id: str, storage: Storage,
+                   *, internal: bool = False) -> PdfLink:
     """A ten-minute link to the approved order's PDF. The row is read under RLS, so
-    an order out of scope is a 404 like any other."""
+    an order out of scope is a 404 like any other. `internal` is the staff-only
+    copy with the approval trail (FS-091); a dealer is refused it outright."""
+    if internal and _is_portal(caller):
+        raise ForbiddenError("The internal copy is for Polysil staff.")
     row = (await db.execute(text(
-        "SELECT order_no::text AS order_no, status::text AS status, pdf_state, pdf_key, pdf_error "
+        "SELECT order_no::text AS order_no, status::text AS status, pdf_state, pdf_key, "
+        "pdf_internal_key, pdf_internal_attempts, pdf_internal_error, pdf_error, "
+        "COALESCE(pdf_lease_until > now(), false) AS leased "
         "FROM sales_order WHERE id = CAST(:id AS uuid) AND deleted_at IS NULL"),
         {"id": order_id})).one_or_none()
     if row is None:
@@ -1706,12 +1716,19 @@ async def pdf_link(db: AsyncSession, caller: Caller, order_id: str, storage: Sto
     if row.pdf_state == "failed":
         raise ConflictError("The PDF could not be produced.", code="pdf_failed",
                             fields={} if _is_portal(caller) else {"pdf_error": row.pdf_error or ""})
-    if row.pdf_state != "ready":
+    key = row.pdf_internal_key if internal else row.pdf_key
+    if internal and row.pdf_state == "ready" and domain.internal_pdf_state(
+            row.pdf_state, key, row.pdf_internal_attempts, leased=row.leased) == "failed":
+        raise ConflictError("The internal copy could not be produced.", code="pdf_failed",
+                            fields={"pdf_error": row.pdf_internal_error
+                                    or "the worker stopped during each of 5 renders"})
+    # an order rendered before 092 owes its internal copy until the worker renders it
+    if row.pdf_state != "ready" or key is None:
         raise ConflictError("The PDF is being prepared; try again in a few seconds.",
                             code="pdf_pending")
-    filename = domain.pdf_filename(row.order_no)
+    filename = domain.pdf_filename(row.order_no, internal=internal)
     try:
-        url, expires = storage.presign_get(row.pdf_key, filename=filename)
+        url, expires = storage.presign_get(key, filename=filename)
     except RuntimeError as exc:
         log.warning("order.storage_unavailable", reason=str(exc))
         raise ConflictError(_STORAGE_DOWN, code="storage_unavailable") from exc

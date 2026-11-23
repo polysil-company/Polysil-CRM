@@ -53,7 +53,12 @@ FRONTEND_SRC = ROOT / "scripts" / "local" / "reviewstaging" / "Frontend"
 RELEASED_NAV = ("dashboard", "messages", "leads", "qr-codes", "quotations", "sales-orders",
                 "approvals", "tasks", "dispatch", "approval-limits", "products", "users",
                 "channel-partners", "team-map", "duty", "visits", "org-chart", "reports",
-                "company-settings", "tracking-settings")
+                "company-settings", "tracking-settings",
+                # the full release, 23 Nov 2026
+                "help", "customers", "ledger", "subsidy", "targets", "complaints", "ratings",
+                "dealer-tasks", "marketing", "campaigns", "schemes", "rewards", "accounts",
+                "receipts", "dealer-commissions", "stock", "complaint-targets",
+                "subsidy-masters", "masters")
 # --source: the code comes from a checkout of the shared repo (its backend/ and
 # Frontend/), the release branch; the client's data files always come from here
 CODE_ROOT = ROOT

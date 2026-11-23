@@ -447,7 +447,8 @@ def test_a_gujarati_name_and_hindi_terms_survive_the_text_layer() -> None:
     assert GUJARATI_NAME in text and HINDI_TERMS in text
 
 
-def assert_every_glyph_on_the_page(data: bytes, only: re.Pattern[str] | None = None) -> None:
+def assert_every_glyph_on_the_page(data: bytes, only: re.Pattern[str] | None = None,
+                                   *, every_page: bool = True) -> None:
     """Each text run's estimated end lies inside its page's media box. Shared
     with the order PDF's test (FS-090: line figures at the ₹1,000 crore ceiling).
     `only` limits the check to runs it matches: the estimate is a floor for
@@ -469,7 +470,10 @@ def assert_every_glyph_on_the_page(data: bytes, only: re.Pattern[str] | None = N
             ends.append((start + 0.5 * size * scale * len(text.strip()), text.strip()))
 
         page.extract_text(visitor_text=visit)
-        assert ends, "no text on the page"
+        if not ends:
+            # FS-091: a page of the internal copy may hold none of the runs `only` picks
+            assert not every_page, "no text on the page"
+            continue
         widest = max(ends)
         assert widest[0] <= width, (widest, width)
 

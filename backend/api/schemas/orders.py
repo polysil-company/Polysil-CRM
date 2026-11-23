@@ -486,6 +486,12 @@ class Order(BaseModel):
         description="The approved order's PDF: none before approval, pending while the "
                     "worker renders it, ready to download, or failed.")
     pdf_error: str | None = Field(default=None, description="Why the PDF failed. Staff only.")
+    pdf_internal_state: Literal["none", "pending", "ready", "failed"] | None = Field(
+        default=None,
+        description="Staff only, null for a dealer (FS-091): the internal copy with the "
+                    "approval trail. ready shows \"Download internal copy\" "
+                    "(`GET /orders/{id}/pdf?copy=internal`); pending shows \"Preparing "
+                    "internal copy\"; failed hides the button.")
     confirmation: Literal["queued", "no_mobile", "disabled"] | None = Field(
         default=None, description="Whether the buyer was sent the WhatsApp confirmation on "
                                   "approval: queued, no_mobile (tell the officer to call), "

@@ -125,3 +125,24 @@ def test_export_problems(order_type: str, country: str | None, gstin: str | None
 def test_a_free_sample_is_every_line_at_full_discount_on_tier_one() -> None:
     assert (Decimal(100), Decimal(0), Decimal(0)) == domain.FREE_DISCOUNTS
     assert {"export", "sample", "subsidised"} == domain.STAFF_ONLY_TYPES
+
+
+@pytest.mark.parametrize(("state", "key", "attempts", "shown"), [
+    (None, None, 0, "none"), ("none", None, 0, "none"),
+    ("pending", None, 0, "pending"), ("rendering", None, 0, "pending"),
+    ("failed", None, 0, "failed"),
+    ("ready", "orders/k-internal.pdf", 0, "ready"),
+    ("ready", None, 4, "pending"), ("ready", None, 5, "failed"),
+])
+def test_the_internal_copy_state_follows_the_customer_copy_then_its_own(
+        state: str | None, key: str | None, attempts: int, shown: str) -> None:
+    """FS-091 §7, plan review R-7."""
+    from api.domain.orders import internal_pdf_state
+    assert internal_pdf_state(state, key, attempts) == shown
+
+
+def test_the_fifth_render_in_flight_is_pending_and_a_cancelled_order_is_none() -> None:
+    """Code review F-2 and F-4."""
+    from api.domain.orders import internal_pdf_state
+    assert internal_pdf_state("ready", None, 5, leased=True) == "pending"
+    assert internal_pdf_state("ready", None, 1, cancelled=True) == "none"

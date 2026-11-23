@@ -7,6 +7,21 @@
   /* landscape: nineteen columns do not fit a portrait A4 at a legible size
      (cross-vendor A-3); the CI test checks every glyph lies on the page */
   @page { size: A4 landscape; margin: 12mm 10mm 14mm 10mm; }
+  {% if internal %}
+  /* FS-091: the internal copy only */
+  .internal { border-color: #1f4e79; color: #1f4e79; }
+  .trail { margin-top: 8mm; page-break-before: auto; }
+  .trail h2 { font-size: 12pt; margin: 0 0 2mm; }
+  .round { margin-top: 4mm; page-break-inside: avoid; }
+  .round h3 { font-size: 9.5pt; margin: 0 0 1mm; }
+  .trail table { font-size: 8pt; margin-top: 1.5mm; table-layout: fixed; }
+  .trail td.remark, .note { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .trail col.seq { width: 7mm; } .trail col.role { width: 34mm; } .trail col.by { width: 48mm; }
+  .trail col.dec { width: 22mm; } .trail col.when { width: 30mm; }
+  /* FS-091 EC-10: every page of the internal copy says so, not only the first */
+  @page { @top-right { content: "Internal copy. Not for the customer."; font-size: 8pt;
+                       color: #1f4e79; font-family: "Noto Sans", "DejaVu Sans", sans-serif; } }
+  {% endif %}
   body { font-family: "Noto Sans", "Noto Sans Gujarati", "Noto Sans Devanagari", "DejaVu Sans", sans-serif;
          font-size: 10.5pt; color: #111; }
   h1 { font-size: 18pt; margin: 0 0 2mm; }
@@ -44,6 +59,9 @@
     Approved {{ o.approved_at | date }} &middot; Ordered {{ o.submitted_at | date }} &middot;
     Prices as on {{ o.price_effective_date | date }} &middot; {{ o.order_type | replace('_', ' ') | capitalize }} order
   </div>
+  {% if internal %}
+  <div class="banner internal">Internal copy. Not for the customer.</div>
+  {% endif %}
   {% if is_provisional %}
   <div class="banner">Indicative pricing: rates and tax on this document are provisional</div>
   {% endif %}
@@ -144,8 +162,44 @@
 
   <div class="terms"><strong>Payment terms</strong><br>{{ o.payment_terms | replace('_', ' ') | capitalize }}</div>
 
+  {% if internal %}
+  {% if internal.remarks %}
+  <div class="terms"><strong>Order remarks</strong><div class="note">{{ internal.remarks }}</div></div>
+  {% endif %}
+  {% if internal.amend_reason %}
+  <div class="terms"><strong>Amended {{ internal.amend_count }} time{{ 's' if internal.amend_count != 1 }}. Last reason</strong><div class="note">{{ internal.amend_reason }}</div></div>
+  {% endif %}
+  <section class="trail">
+    <h2>Approval trail</h2>
+    {% for a in internal.approvals %}
+    <div class="round">
+      <h3>Round {{ a.round }}: {{ a.status | outcome }}{% if a.amount %} &middot; order total {{ a.amount | rupees }}{% endif %}</h3>
+      <div class="muted">Asked {{ a.requested_at | datetime }}{% if a.requested_by %} by {{ a.requested_by }}{% endif %}{% if a.decided_at %} &middot; Decided {{ a.decided_at | datetime }}{% endif %}</div>
+      {% if a.request_remark %}<div class="note">Why asked: {{ a.request_remark }}</div>{% endif %}
+      <table>
+        <colgroup><col class="seq"><col class="role"><col class="by"><col class="dec"><col class="when"><col></colgroup>
+        <thead><tr><th>Step</th><th>Role</th><th>Decided by</th><th>Decision</th><th>When</th><th>Remark</th></tr></thead>
+        <tbody>
+          {% for s in a.steps %}
+          <tr>
+            <td>{{ s.seq }}</td><td>{{ s.role }}</td>
+            <td>{% if s.by %}{{ s.by }}{% if s.decided_role %} (as {{ s.decided_role }}){% endif %}{% endif %}</td>
+            <td>{% if s.decision == 'approve' %}Approved{% elif s.decision == 'reject' %}Returned{% elif a.status == 'pending' %}Waiting{% else %}Not reached{% endif %}</td>
+            <td>{{ s.decided_at | datetime }}</td>
+            <td class="remark">{{ s.remark or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="muted">No approval round: this order was approved without one.</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <div class="foot">
-    Sales order {{ o.order_no }}. Prepared on {{ rendered_on }}.
+    {% if internal %}Internal copy. {% endif %}Sales order {{ o.order_no }}. Prepared on {{ rendered_on }}.
     Tax is worked out per line at the rate in force on the price date; each component is rounded on its own and the
     document total is the sum of the rounded lines.
   </div>

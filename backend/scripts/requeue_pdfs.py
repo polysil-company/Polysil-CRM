@@ -54,7 +54,16 @@ async def requeue_rows(session: AsyncSession) -> tuple[list[Any], list[Any]]:
         "UPDATE sales_order SET pdf_state = 'pending', pdf_attempts = 0, pdf_error = NULL, "
         "pdf_next_attempt_at = now(), pdf_lease = NULL, pdf_lease_until = NULL "
         "WHERE pdf_state = 'failed' AND status <> 'cancelled' RETURNING id"))).all()
-    return list(quotations), list(orders)
+    # FS-091 (plan review R-3): an internal copy that gave up on a ready order; the
+    # customer copy is left as it is
+    internal = (await session.execute(text(
+        "UPDATE sales_order SET pdf_internal_attempts = 0, pdf_internal_error = NULL, "
+        "pdf_next_attempt_at = now(), pdf_lease = NULL, pdf_lease_until = NULL "
+        "WHERE pdf_state = 'ready' AND pdf_internal_key IS NULL AND status <> 'cancelled' "
+        "AND deleted_at IS NULL AND pdf_internal_attempts >= 5 "
+        # a live render keeps its lease (code review F-3)
+        "AND COALESCE(pdf_lease_until, '-infinity') < now() RETURNING id"))).all()
+    return list(quotations), list(orders) + [r for r in internal if r not in orders]
 
 
 async def requeue() -> int:
