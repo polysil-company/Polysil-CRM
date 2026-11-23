@@ -265,6 +265,7 @@ def test_every_page_of_the_internal_copy_says_so_and_a_long_remark_stays_on_it()
     data = render_pdf(job.render_html(doc, internal=True))
     pages = [p.extract_text() or "" for p in pypdf.PdfReader(io.BytesIO(data)).pages]
     assert len(pages) > 1
+    # pypdf spaces a margin box's runs as it likes ("customer ."), so compare without them
     for i, text in enumerate(pages):
-        assert "Internal copy. Not for the customer." in text, f"page {i + 1}"
+        assert "Internalcopy.Notforthecustomer." in re.sub(r"\s+", "", text), f"page {i + 1}"
     assert_every_glyph_on_the_page(data, only=re.compile(r"^X+$"))
