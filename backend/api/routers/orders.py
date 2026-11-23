@@ -8,7 +8,7 @@ is 404. Money and quantities come back as decimal strings.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -55,6 +55,7 @@ approvals = APIRouter(prefix="/approvals", tags=["approvals"])
 dispatches = APIRouter(prefix="/dispatches", tags=["dispatch"])
 
 Id = Annotated[str, Path(pattern=UUID_RE)]
+PdfCopy = Literal["customer", "internal"]
 Cursor = Annotated[str | None, Query(description="From the previous page's next_cursor.")]
 ToDate = Annotated[str | None, Query(alias="to", description="ISO date, inclusive.")]
 _OWNER_RE = "^(me|" + UUID_RE.strip("^$") + ")$"
@@ -242,15 +243,22 @@ async def order_schemes(order_id: Id, db: DbSession) -> Envelope[OrderSchemePrev
                                         "`pdf_pending`, `pdf_failed`, `order_cancelled` or "
                                         "`storage_unavailable`."}},
             dependencies=[Depends(require("sales_orders", "view"))])
-async def order_pdf(order_id: Id, db: DbSession, caller: CallerDep) -> Envelope[PdfLink]:
+async def order_pdf(
+    order_id: Id, db: DbSession, caller: CallerDep,
+    copy: Annotated[PdfCopy, Query(description=(
+        "`customer` (default): the order as the buyer gets it, no names or remarks. "
+        "`internal`: staff only, the same order with every approval round, who "
+        "decided and their remarks (FS-091). A dealer gets `403`."))] = "customer",
+) -> Envelope[PdfLink]:
     """A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
     do not fetch it with the bearer token.** The order's `pdf_state` says when to
-    offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
-    before approval, `409 pdf_pending` while the worker has not finished,
-    `409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
-    once the order is cancelled."""
+    offer it: `ready` shows "Download PDF" (and, for staff, "Download internal
+    copy"), `pending` shows "Preparing PDF". `404` before approval, `409 pdf_pending`
+    while the worker has not finished, `409 pdf_failed` when it gave up (staff see
+    `pdf_error`), `409 order_cancelled` once the order is cancelled."""
     return Envelope(data=await service.pdf_link(db, caller, order_id,
-                                                get_storage(get_settings())))
+                                                get_storage(get_settings()),
+                                                internal=copy == "internal"))
 
 
 @router.patch("/{order_id}", response_model=Envelope[Order], responses=_MUTATION_ERRORS,

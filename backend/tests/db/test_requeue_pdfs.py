@@ -38,3 +38,20 @@ async def test_a_dead_quotation_keeps_its_failed_pdf(db: AsyncSession, ids: Fixt
     back = {str(r.id) for r in quotations}
     assert live in back
     assert old not in back and rejected not in back
+
+
+async def test_an_internal_copy_that_gave_up_comes_back_and_the_customer_copy_stays(
+        db: AsyncSession) -> None:
+    """FS-091, plan review R-3: after a storage outage the internal copy is retried."""
+    from tests.db.test_migration_016 import _approved
+
+    _, order = await _approved(db)
+    await db.execute(text("UPDATE sales_order SET pdf_state = 'ready', pdf_key = 'orders/c.pdf', "
+                          "pdf_internal_key = NULL, pdf_internal_attempts = 5, "
+                          "pdf_internal_error = 'NoSuchBucket' WHERE id = CAST(:o AS uuid)"),
+                     {"o": order})
+    _, orders = await requeue_pdfs.requeue_rows(db)
+    assert order in {str(r.id) for r in orders}
+    row = (await db.execute(text("SELECT pdf_state, pdf_key, pdf_internal_attempts, pdf_internal_error "
+                                 "FROM sales_order WHERE id = CAST(:o AS uuid)"), {"o": order})).one()
+    assert tuple(row) == ("ready", "orders/c.pdf", 0, None)

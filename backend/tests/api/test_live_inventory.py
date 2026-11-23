@@ -22,6 +22,7 @@ import contextlib
 import datetime as dt
 import inspect
 import json
+import sys
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -174,7 +175,12 @@ def test_the_gate_reader_sees_both_kinds_of_gate() -> None:
     `require`, an unreleased `require`, and a `require_any`."""
     routes = _routes()
     assert _gates(routes[f"{V1}/leads"]) == [[("leads", "view")]]
-    assert forbidden_on_production(routes[f"{V1}/complaints"])
+    # every module is released since 23 Nov; an unreleased one is simulated
+    assert not forbidden_on_production(routes[f"{V1}/complaints"])
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(sys.modules[__name__], "RELEASED",
+                   tuple(m for m in RELEASED if m != "complaints"))
+        assert forbidden_on_production(routes[f"{V1}/complaints"])
     assert not forbidden_on_production(routes[f"{V1}/leads"])
     assert any(len(g) > 1 for r in routes.values() for g in _gates(r)), \
         "no require_any gate found: the reader no longer sees them"

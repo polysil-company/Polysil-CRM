@@ -600,6 +600,7 @@ Three rules per report: the aggregate keeps its scope dimensions, `REVOKE` on th
 | dispatch | V:global | V:global CEA | | | | V:global |
 | complaints | V:global | | V:global CEA | | | V:global CE |
 | payments | V:global CEA | | | | | |
+| partners | V:global | | | | | |
 | subsidy | V:global | | | **V:territory CE** | | |
 | marketing_material | | | | | V:global CEAD | |
 | campaigns | | | | | V:global CEAD | |

@@ -550,16 +550,17 @@ Replace a draft's lines wholesale, priced as new lines.
 
 A URL for the approved order's PDF, valid ten minutes. **Open it in a new tab;
 do not fetch it with the bearer token.** The order's `pdf_state` says when to
-offer it: `ready` shows "Download PDF", `pending` shows "Preparing PDF". `404`
-before approval, `409 pdf_pending` while the worker has not finished,
-`409 pdf_failed` when it gave up (staff see `pdf_error`), `409 order_cancelled`
-once the order is cancelled.
+offer it: `ready` shows "Download PDF" (and, for staff, "Download internal
+copy"), `pending` shows "Preparing PDF". `404` before approval, `409 pdf_pending`
+while the worker has not finished, `409 pdf_failed` when it gave up (staff see
+`pdf_error`), `409 order_cancelled` once the order is cancelled.
 
 **Parameters**
 
 | Name | In | Type | Required | Notes |
 |---|---|---|---|---|
 | `order_id` | path | string | yes |  |
+| `copy` | query | `customer` \| `internal` |  | `customer` (default): the order as the buyer gets it, no names or remarks. `internal`: staff only, the same order with every approval round, who decided and their remarks (FS-091). A dealer gets `403`. |
 
 **Responses**
 
@@ -927,6 +928,7 @@ and only the outcome to a dealer.
 | `remarks` | string \| null | yes |  |
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `pdf_internal_state` | `none` \| `pending` \| `ready` \| `failed` \| null |  | Staff only, null for a dealer (FS-091): the internal copy with the approval trail. ready shows "Download internal copy" (`GET /orders/{id}/pdf?copy=internal`); pending shows "Preparing internal copy"; failed hides the button. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
