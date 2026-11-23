@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Final
+from typing import Final, Literal
 
 # rule 18 / GAP-121: the order types priced today; the rest name their question.
 # FS-042 added export and sample, each on a setting standing in for its question.
@@ -199,9 +199,12 @@ def internal_pdf_storage_key(order_id: str, lease: str, nonce: str) -> str:
     return f"orders/{order_id}/{lease}-{nonce}-internal.pdf"
 
 
+PdfShown = Literal["none", "pending", "ready", "failed"]
+
+
 def internal_pdf_state(pdf_state: str | None, internal_key: str | None,
                        internal_attempts: int, *, leased: bool = False,
-                       cancelled: bool = False) -> str:
+                       cancelled: bool = False) -> PdfShown:
     """What the staff "Download internal copy" button shows (FS-091 §7): the
     customer copy's state until that is ready, then the internal copy's own.
     The fifth attempt is charged when it is claimed, so it is failed only once no
