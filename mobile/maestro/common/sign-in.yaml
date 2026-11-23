@@ -1,0 +1,22 @@
+# Signs in as staff, if the sign-in screen is showing. Credentials come from -e STAFF_EMAIL / STAFF_PASSWORD.
+appId: com.polysil.crm
+---
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 45000
+- tapOn:
+    text: "Staff email"
+    optional: true
+# Tap the field's label, not the field: on Android WebView 150+ a text box loses its accessible
+# name, but tapping a <label> still focuses its box.
+- tapOn: "Work email"
+- inputText: ${STAFF_EMAIL}
+- tapOn: "Password"
+- inputText: ${STAFF_PASSWORD}
+- hideKeyboard
+- tapOn:
+    text: "Sign in"
+    below: "Forgot it\\? Ask your administrator to reset it\\."
+- extendedWaitUntil:
+    visible: "Dashboard"
+    timeout: 45000

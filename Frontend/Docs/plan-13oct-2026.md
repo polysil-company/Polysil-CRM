@@ -1,0 +1,218 @@
+# Frontend plan from 13 October 2026
+
+What the backend serves that the frontend doesn't use yet, in the order to build it. Any session can pick this up: take the first unticked item, build it, and tick it in the same PR.
+
+_Measured 13 October 2026 against `integration` at `b8632ed`: the backend documents 379 endpoints, and **183 have no frontend**. The full list is in [Frontend-Handover.md §12](Frontend-Handover.md#12-appendix-every-backend-endpoint-without-a-frontend-13-october-2026)._
+
+## How to use this file
+
+1. **Before starting,** read [`AGENTS.md`](../AGENTS.md), then [Frontend-Handover.md](Frontend-Handover.md) end to end, and follow its process (§4) and the user's rules (§2).
+2. **Take the first item that is `[ ]`,** top to bottom, unless the user says otherwise.
+3. **When you start it,** make a branch from the latest `origin/integration` (`feature/<DATA-ID>-<slug>`). Mark the item `[~]` with the branch name, in that branch's first commit.
+4. **When its PR is open,** change `[~]` to `[x]` and add the PR number and date, in the same PR. A reviewer then sees the plan move with the code.
+5. **If a session ends part way,** leave the item `[~]` with a note on what is done and what is left, and push the branch.
+6. **If something new turns up** (a new backend handover, a new ask, a user decision), add it here under the right tier, with the date.
+
+Legend: `[ ]` to do · `[~]` in progress (branch named) · `[x]` done (PR named) · `[-]` dropped or waiting (reason given).
+
+## Decisions so far
+
+- **13 Oct, from the user:**
+  - Build in this order.
+  - Subsidised quotations and subsidised orders are **not** part of go-live, so they sit in Tier 3.
+  - Keep this file current as each task finishes.
+- **Go-live menu:** `RELEASED_NAV` in `backend/scripts/deploy_staging.py` lists the screens the client's deployment shows: Dashboard, Messages, Leads, Quotations, Orders, Approvals, Tasks, Dispatch, Approval limits, Products, Users and Channel partners. Anything outside that list is hidden there (APP-007), but still built and tested.
+
+---
+
+## Tier 1: gaps inside the go-live screens
+
+- [x] **1. Amend an approved order.** PR #124, 13 Oct (`feature/SO-007-amend-order`). Also fixed there: the duplicated §9 paragraph in `Plan.md`.
+  - Endpoint: `POST /orders/{id}/amend`.
+  - Contract: `backend/docs/handover/settings-amend-reopen-contract.md`, and "Amend after a voided dispatch" in `subsidised-orders-and-small-changes.md`.
+  - Data ID: register a new `SO-` id (next free: SO-007).
+- [x] **2. Order list filters by area and office.** PR #125, 14 Oct (`feature/SO-001-order-area-filters`). The lead list's Area pill now also serves orders (`source="territories"`).
+  - `territory_id` (a comma list; a state selects its districts) and `owner_org_unit_id`, on `GET /orders`, `/orders/stats` and `/orders/export`.
+  - Reuse the lead list's area picker.
+  - SO-001.
+- [x] **3. Order stats and the Accounts queue** (BE-022, done on the backend). PR #127, 14 Oct, stacked on #125: merge #125 first, then retarget #127 to `integration`. It also fixes the menu's permission: `payments`, not `accounts`.
+  - `GET /orders/stats`.
+  - The queue is `GET /orders?waiting_on=account_manager`, and its badge is stats `waiting_on.account_manager`.
+  - ACCT-001: the nav item says "Soon" today, and it is not in `RELEASED_NAV`.
+  - Contract: `accounts-queue-order-names.md`. Payments themselves are Tier 4 (item 26).
+- [x] **4. Dashboard: two new charts.** PR #128, 14 Oct (`feature/RPT-001-dashboard-charts`). Also adds the `targets` permission module and a target line on `ProportionBar`.
+  - `area_by_system: [{system, name, leads, hectares}]`.
+  - `targets_by_month: [{month, target, achieved}]`: 6 months, null without a targets permission.
+  - Both on `GET /dashboard/overview`. RPT-001.
+  - Contract: "Five small changes" in `dealer-recruitment-and-small-changes.md`. Read the `dataviz` guidance before drawing them.
+- [x] **5. One conversation by id** (BE-021, done on the backend). PR #131, 14 Oct (`feature/MSG-004-read-one-conversation`). Groups (`participant: null`) are left to item 7.
+  - `GET /conversations/{id}`, so the thread header names the colleague after a reload or from a shared link.
+  - MSG-002, MSG-004.
+- [x] **6. The dealership enquiry type and GSTIN details.** PR #132, 15 Oct (`feature/LEAD-015-dealership-enquiry`). LEAD-015 and CHNL-006.
+  - Leads take `inquiry_type: "dealership"`, shown as "Dealership"; such a lead can go from qualified straight to won.
+  - `GET /gstin/{gstin}`: prefill the legal and trade names on the channel-partner form when found, and keep them editable.
+  - Contract: `subsidised-orders-and-small-changes.md`, "The dealership enquiry type" and "GSTIN details".
+  - LEAD-, CHNL-.
+- [x] **7. Group chats.** PR #133, 15 Oct (`feature/MSG-006-group-chats`), stacked on #131: merge #131 first, then retarget #133 to `integration`.
+  - `POST /conversations/groups`, `PATCH /conversations/{id}`, and the members endpoints (list, add, remove).
+  - Contract: `group-chat.md`.
+  - Data ID: register a new `MSG-` id (next free: MSG-006).
+- [x] **8. Masters admin.** The lists and lead scoring: PR #134, 15 Oct (`feature/MSTR-001-masters-lists`, MSTR-009, MSTR-010; asks BE-026). Offices: PR #135, 15 Oct (`feature/MSTR-011-masters-offices`, MSTR-011), stacked on #134: merge #134 first, then retarget #135 to `integration`.
+  - Create and edit the lookups: complaint types, crops, lead sources, lost reasons, meeting types and MIS systems. That is 12 endpoints under `/lookups/*`.
+  - Lead scoring: `GET`/`PATCH /lookups/scoring`.
+  - Offices: `POST /org-units`, `GET`/`PATCH /org-units/{id}`, close and reopen.
+  - The nav item is Admin → Masters (MSTR-001, "Soon"); complaint types are CMPL-008.
+  - Contracts: `backend/docs/api/lookups.md`, `org-units.md`, `complaints-contract.md`.
+
+## Tier 2: smaller missing pieces of built modules
+
+- [x] **9. Reopen a closed complaint:** `POST /complaints/{id}/reopen` (`settings-amend-reopen-contract.md`). PR #136, 15 Oct (`feature/CMPL-010-reopen-complaint`, CMPL-010).
+- [x] **10. Subsidy applications:** PR #137, 15 Oct (`feature/SUBS-015-reopen-application`, SUBS-015, SUBS-007). The checklist is a read-only Documents tab in Subsidy masters.
+  - Reopen a closed file: `POST /subsidy-applications/{id}/reopen` (`subsidy-completion.md` §4).
+  - The document types: `GET /subsidy-document-types`.
+- [x] **11. One approval request on its own:** `GET /approvals/{request_id}`. Checked 15 Oct: **not needed, nothing to build.**
+  - Every approval notification (`approval_requested`) points at the order, the quotation or the complaint, never at the approval itself: `v_type` is `sales_order`, `quotation` or `complaint` in `notify_step` (migrations 023 and 026).
+  - Those pages already carry the approval chain (`approval.steps[]`), and the inbox gets the decided request back from its own `POST`.
+  - Build it only if a notification ever sends `resource.type = "approval"`; `resourceHref` would then need a screen for it.
+- [x] **12. One set of minutes on its own page:** PR #138, 15 Oct (`feature/TASK-007-minutes-page`, TASK-007, which already listed the endpoint). "From meeting minutes" on a task links to `/tasks/minutes/{id}`. `GET /minutes/{id}` (`tasks-and-planner-contract.md`).
+- [x] **13. Check the screens against three handovers,** which the endpoint count can't see. Checked 15 Oct:
+  - Exports: all eight lists have Download Excel (`export_too_large` handled; no button on the complaints "Waiting on me" queue). Nothing to do.
+  - QR codes: Active/Off chip and Edit exist. Assign: the response replaces the lead, so the new office shows. Nothing to do.
+  - Quotation print: the PDF opens as a link, so mixed orientation is fine; the one-discount-column mirror is optional and left.
+  - **Gap: dormant leads** (banner, Reopen to `dormant_from_stage`, Mark lost): PR #139, 15 Oct (`feature/LEAD-007-dormant-leads`).
+  The handovers:
+  - `list-exports.md`: every list it names has an export.
+  - `lead-small-gaps-contract.md`: dormant leads, and assigning moves the lead's office.
+  - `quotation-print-format.md`: optionally, the quotation page shows one discount column, as the PDF now does.
+- [x] **14. Andhra Pradesh in the calculator** (FS-063, `andhra-pradesh-subsidy.md`). PR #140, 15 Oct (`feature/SUBS-002-scheme-inputs`): every scheme's `inputs` (CG, RJ, UP, AP), AP's null matrix ids and state GST, and the scheme picker's default fixed.
+  - Checked 15 Oct: the calculator reads none of the config's `inputs`, so CG, RJ and UP's fields (`state-subsidy-formulas.md`) are missing too, and an AP drip result (`regular_matrix_id: null`) would fail the response schema. This item builds every scheme's inputs from the config.
+  - Drip asks for "Guided cost (from the AP MIP portal)" and "Fittings and accessories", read from `GET /subsidy/config?scheme=AP`.
+  - Not checked yet whether the calculator builds these inputs from the config by itself.
+- [-] **15. Staging checks (🔌) for #111, #112 and #113:** waiting on staging credentials from the user (asked 15 Oct).
+  - a real `.xlsx` import into a draft price list and into a quotation;
+  - add a distributor, a dealer under it, and close a partner that has a user;
+  - attach a PDF and a HEIC photo, then open both.
+
+  Follow `Docs/Live-Test-Plan.md`. Credentials come from the user, never from a file, and no WhatsApp messages go to real customers.
+- [x] **39. Import polish** (added 17 Oct, from the user after the staging walk: "shouldn't it be visible beside New price list?"). MSTR-013. PR #154, 17 Oct (`feature/MSTR-013-import-polish`, from `integration`). `backend/docs/api/imports.md`.
+  - **Download the template** in every import: `GET /imports/template?kind=`.
+  - Upload refusals on their fields: `fields.file`, `fields.sheet`, `fields.header_row`.
+  - **Import from Excel** beside **New price list**: start the draft, then open its import.
+
+## Tier 3: subsidised quotations and orders (not go-live, per the user on 13 Oct)
+
+- [x] **16. Subsidised quotation.** PR #141, 15 Oct (`feature/QUOT-013-subsidised-quotation`, QUOT-014), stacked on #140: merge #140 first, then retarget #141 to `integration`.
+  - `PUT /quotations/{id}/subsidy` and `GET /quotations/{id}/subsidy/calculation`.
+  - Contract: `subsidised-quotations.md`.
+- [x] **17. Subsidised order.**
+  - [x] **17a. From a subsidised quotation.** PR #142, 15 Oct (`feature/SO-008-subsidised-order`, SO-008), stacked on #141. Also: the order's Subsidy card, editing a draft's amounts, and Edit items keeping a fixed type.
+  - [x] **17b. Typed in directly**, with the multi-lead picker (1 to 50) and the amounts on the new-order screen. PR #143, 15 Oct (`feature/SO-008-direct-subsidised-order`), stacked on #142. Edit the subsidy also adds and removes leads.
+  - `PUT /orders/{id}/subsidy`, and the "Subsidised" type on the new-order screen and the order page.
+  - Contract: `subsidised-orders-and-small-changes.md`.
+- [x] **18. Subsidy completion** (`subsidy-completion.md`). PR #144, 15 Oct (`feature/SUBS-006-subsidy-completion`; SUBS-006, SUBS-002, NOTIF-001, SO-008), stacked on #143. Reopening a closed file (its part 4) is already in #137. The payable shows on the Subsidy card only; payments elsewhere are item 26:
+  - the farmer's share paying a subsidised order;
+  - the dispatch date on an application;
+  - the new bell notifications;
+  - Sprinkler areas between table steps.
+
+## Tier 4: modules with no screens yet
+
+In the handover's order of value to the client (§10, P2). Each has a contract in `backend/docs/api/` and a handover in `backend/docs/handover/`.
+
+- [x] **19. Dealer recruitment** (17 endpoints).
+  - [x] **19a. The staff screens.** PR #145, 15 Oct (`feature/CHNL-007-dealer-recruitment`, CHNL-007), stacked on #132: the list, start with its link, edit, documents, submit, new link, withdraw, decide.
+  - [x] **19b. The applicant's page** `/dealer-apply/<token>`. PR #146, 15 Oct (`feature/CHNL-008-dealer-apply-page`, CHNL-008), stacked on #145: verify by WhatsApp code, fill in, Check GSTIN, documents, submit.
+  - Contract: `dealer-recruitment-and-small-changes.md`, `docs/api/dealer-applications.md`.
+- [x] **20. Territories admin** (4). PR #147, 15 Oct (`feature/MSTR-012-masters-territories`, MSTR-012), a Territories tab in Masters, stacked on #135. `backend/docs/api/territories.md`.
+- [x] **21. Company settings** (2). `settings-amend-reopen-contract.md`. PR #148 (`feature/ADMN-007-company-settings`, from `integration`): all 18 settings the backend seeds, in sections.
+- [x] **22. Reports, and the 360° lead view** (9). RPT-002. `reports-contract.md`, `when-a-sale-counts.md`. PR #149 (`feature/RPT-002-reports`, from `integration`): eight reports (campaign performance too) and At a glance on a lead (RPT-003).
+- [x] **23. Targets and achievement** (3). `targets-contract.md`. PR #150 (`feature/TGT-001-targets`, from `integration`): your month, your team, and Set targets with its history.
+- [x] **24. Schemes and promotions** (6, plus `GET /orders/{id}/schemes`). `schemes-contract.md`. In two parts:
+  - [x] **24a. The schemes** (SCHM-001…004): the list, a scheme, create and edit, standing, credits; BE-027 asked. PR #155, 17 Oct (`feature/SCHM-001-schemes`, from `integration`).
+  - [x] **24b. Benefits on the order** (SCHM-005): the scheme preview on a draft order, `benefits` and "To pay" after submit. PR #156, 17 Oct (`feature/SCHM-005-order-benefits`), stacked on #155: merge #155 first, then retarget #156 to `integration`.
+- [x] **25. Reward points** (19), **and dealer commission and TOD** (12). `rewards-contract.md`, `dealer-commission-contract.md`. In two parts, commission first because it needs nothing still open:
+  - [x] **25a. Dealer commission and TOD** (SUBS-016…018): stage 18 on the application, Operations → Dealer commissions for Accounts, and Commission rates in Subsidy masters. PR #157, 17 Oct (`feature/SUBS-016-dealer-commission`, from `integration`).
+  - [x] **25b. Reward points** (RWD-001…004): points and history, gifts and requests, the gift desk, earning rules, point value, gifts and adjustments for Admin, and points on a dealer's draft order. PR #158, 17 Oct (`feature/RWD-001-reward-points`, from `integration`).
+- [x] **26. Payments, partner credit and the dealer ledger** (8). `payments-contract.md`. It goes with item 3. ACCT-002…005: the order's Payments card and instalments, Record payment, Operations → Receipts (allocate the rest, void), and the dealer ledger and credit standing, with My ledger for partner users. PR #159, 17 Oct (`feature/ACCT-002-payments`, from `integration`). The payment status in the approvals inbox is still to do.
+- [x] **27. Marketing material ordering** (11), **and campaigns** (5). MKT-001. `marketing-material-contract.md`, `campaigns.md`. In two parts:
+  - [x] **27a. Marketing material ordering** (MKT-002…004): the catalogue and basket with both shares, the orders and their Excel, approve, refuse, cancel and dispatch, and the catalogue for the marketing team; BE-028 asked. PR #160, 17 Oct (`feature/MKT-002-marketing-material`, from `integration`).
+  - [x] **27b. Campaigns** (MKT-005, MKT-006): the list, a campaign's summary, the form, switch off and delete, and a campaign on leads (picker, name, list filter) and QR codes; the performance report was already built. PR #161, 17 Oct (`feature/MKT-005-campaigns`, from `integration`).
+- [x] **28. Stock** (7): warehouses, availability on the order form, and the stock list. `stock-contract.md`. In two parts:
+  - [x] **28a. The stock screens** (MSTR-014…016): the stock list, the ledger, Record stock, and Warehouses. PR #162, 17 Oct (`feature/MSTR-014-stock`, from `integration`).
+  - [x] **28b. Stock on orders** (DISP-003): Order to, availability per line, the order's warehouse and line stock, and the dispatch's warehouse. PR #163, 17 Oct (`feature/DISP-003-stock-on-orders`).
+- [x] **29. Warranty tracking** (SO-009, CMPL-011, MSTR-017): the order's Warranty card, the chip on complaint lines, and Masters → Warranty periods. PR #164, 18 Oct (`feature/SO-009-warranty`).
+- [x] **30. Export and sample orders,** with the seller GSTINs and their LUTs (3). `export-sample-orders-contract.md`. In two parts:
+  - [x] **30a. Seller GSTINs and their LUTs** (MSTR-018): Products & prices → Seller GSTINs, Add LUT and remove one not in use. PR #165, 18 Oct (`feature/MSTR-018-seller-gstins`).
+  - [x] **30b. Export and sample orders** (SO-010) on the order and quotation forms, the preview's tax treatment, and the fields on their pages. PR #166, 18 Oct (`feature/SO-010-export-sample-orders`).
+- [x] **31. Dealer tasks** (TASK-009): a Dealers group in New task, and a dealer's own Tasks page with Done only, while `tasks_for_dealers` is on. PR #168, 18 Oct (`feature/TASK-009-dealer-tasks`).
+- [x] **32. Complaint holidays and escalation** (MSTR-019, CMPL-012): Masters → Holidays, and a missed target marked on the complaint, in its history and in the bell. PR #169, 18 Oct (`feature/CMPL-012-holidays-escalation`).
+- [x] **33. The customer record** (LEAD-016…018): Sales → Customers, a customer's page with its leads, quotations, orders and timeline, Edit and consent, and the link from a lead. PR #170, 18 Oct (`feature/LEAD-016-customer-record`).
+- [x] **34. Ratings, and the consumer portal** (4 + 8). `ratings-contract.md`, `consumer-portal.md`.
+  - [x] **34a. Ratings** (RATE-001…004): rating an installation, a product or a service, the Ratings page with its summary, and the dealer rating. PR #171, 18 Oct (`feature/RATE-001-ratings`).
+  - [x] **34b. The farmers' portal** (FARM-001…003): sign in by mobile, their own orders, quotations, complaints and enquiries, consent and ratings. PR #172, 18 Oct (`feature/FARM-001-consumer-portal`).
+- [x] **35. Field tracking map screens** (16; the Android app is separate). `field-tracking-contract.md`.
+  - [x] **35a. The team map and a day's route** (TRK-001, TRK-002), on Leaflet and OpenStreetMap. PR #173, 18 Oct (`feature/TRK-001-team-map`).
+  - [x] **35b. Visits on the web** (TRK-003…005): check in with the location and consent, photos, check out, My visits. PR #174, 18 Oct (`feature/TRK-003-visits`).
+  - [x] **35c. Tracking settings and the view log** (TRK-006, TRK-007). PR #175, 18 Oct (`feature/TRK-006-tracking-admin`).
+- [x] **36. The in-app assistant** (2). `in-app-assistant.md`. BOT-001, BOT-002: the Ctrl+K search with Actions and Records, and the Help page. PR #176, 18 Oct (`feature/BOT-001-assistant`).
+- [x] **37. A consolidated order** from several quotations of one dealer: `POST /orders` with several `quotation_ids` (`orders-api-contract.md`). SO-011, in Place order; BE-029 asks for an `orderable` filter. PR #177, 18 Oct (`feature/SO-011-consolidated-order`).
+- [x] **38. The dealer portal walk:** sign in as `dealer`, `distributor` and `sub_dealer`, walk every screen, and fix what leaks or breaks. APP-008: the mock now scopes leads, orders, complaints and the dashboard to the partner's own; two heading fixes and the 404 page's heading; BE-030 asks for the dealer-tasks switch on `/auth/me`. PR #178, 18 Oct (`feature/APP-008-partner-walk`).
+
+## Tier 5: backend changes from 23 Oct to 3 Nov (added 4 Nov)
+
+Measured against `integration` at `33901f8` (#225). Every backend commit since 22 Oct, checked against the frontend source. Item 40 is first because it breaks a screen once the backend deploys migration 078.
+
+- [x] **40. Company settings: the `set` and `staff_roles` kinds.** PR #227, 4 Nov (`feature/ADMN-007-setting-kinds`). ADMN-007. Migration 078 seeds five settings of these kinds (deposit relaxation roles, who decides dealer and distributor applications, what each application type requires). `settings.schemas.ts` accepts only `choice | int | roles | bands | slabs`, so one of them fails the whole page with "We received data we couldn't read".
+  - `set`: some of `allowed`, none twice, as checkboxes. `staff_roles`: at least one staff role code, as checkboxes.
+  - A kind the screen doesn't know is shown read-only, not a contract error, so the next new kind can't take the page down.
+  - Contract: `backend/docs/api/settings.md`.
+- [x] **41. Dealer and distributor applications: the type and the data sheet** (FS-071). PR #228, 4 Nov (`feature/CHNL-007-partner-type-data-sheet`). CHNL-007, CHNL-008. `backend/docs/api/dealer-applications.md`.
+  - `partner_type` (`dealer` or `distributor`) when starting, on edit while draft or returned, and as a list filter. A distributor is approved with no parent and gets a `DIST-` code.
+  - The data sheet's new fields, staff and applicant forms alike: telephone, established on, bank name, branch and address, working capital rows, other sources (lakhs), two-wheelers, cars, other vehicles, office and godown area with their unit, manpower rows, previous installations, sales executives, technicians, appointment place.
+- [x] **42. Dealer and distributor applications: the deposit** (FS-071). PR #229, 5 Nov (`feature/CHNL-007-deposit`). CHNL-007.
+  - The deposit card: amount due, status (`paid`, `waived`, `pending`, `not_required`) and history.
+  - **Record the deposit** (`POST …/deposit`): amount, date paid, reference, and the pay slip uploaded first as a `deposit_slip` document.
+  - **Lower or waive it** (`POST …/deposit/relaxation`): the new amount and why, only for the roles in `deposit_relaxation_roles`, never whoever started the application.
+  - Approve waits for the deposit. The new refusals in words: `deposit_pending`, `deposit_slip_missing`, `deposit_not_due`, `deposit_paid`, `deposit_recorded`, `deposit_short`, `not_lower`, `not_your_relaxation`.
+- [x] **43. Dealer and distributor applications: the printed sheets** (FS-071). PR #230, 5 Nov (`feature/CHNL-007-printed-sheets`). CHNL-007, CHNL-008. The blank form (`GET /dealer-applications/form.pdf?partner_type=`), an application's PDF for staff (`GET /dealer-applications/{id}/pdf`) and for the applicant (`GET /public/dealer-apply/{token}/pdf`).
+- [x] **44. The org chart** (FS-080). PR #231, 5 Nov (`feature/ADMN-008-org-chart`). ADMN-008. `GET /users/org-chart`: my managers, nearest first, and everyone below me with counts by role; someone below me with `user_id`; the whole company with `view=company` for a `users.view` global holder. Register a new `ADMN-` Data ID. `backend/docs/api/users.md`.
+- [x] **45. Sales forecast and insights** (FS-079). PR #232, 5 Nov (`feature/RPT-004-forecast-insights`). RPT-004, RPT-005. `GET /reports/sales-forecast` and `GET /reports/insights` (plain sentences about the period against the one before, each linking its report). New `RPT-` Data IDs. `backend/docs/api/reports.md`.
+- [x] **46. CSV and PDF downloads** (FS-077). PR #235, 5 Nov (`feature/APP-011-csv-pdf-downloads`). APP-011. Every list's download takes `format=csv` as well as Excel; reports also take `format=pdf` (`503 busy`: try again in a moment). Extend `DownloadExcelButton` with the choice, rather than a button per format.
+- [x] **47. Downloads on 24 more lists** (FS-081). PR #236, 5 Nov (`feature/APP-012-list-downloads`), stacked on #235. APP-012. With the same button: products, price lists and a list's rates, tax rates, seller GSTINs, territories, offices, warehouses, stock, stock movements, customers, ratings, payments, schemes, scheme entitlements, subsidy schemes, campaigns, holidays, warranty terms, reward rules, the rewards ledger, gifts, gift redemptions, dealer applications.
+- [x] **48. Email preferences** (FS-078). PR #233, 5 Nov (`feature/AUTH-008-email-preferences`). AUTH-008. On the user's own menu: "Email me updates I haven't seen" and "Morning summary", shown only while `email_available` on `/auth/me` is true; `PUT /me/email-preferences`. Email stays off on the backend until a mail account is set up. `backend/docs/api/auth.md`.
+- [x] **49. Restore lead: the small gaps** (LEAD-020). PR #234, 5 Nov (`feature/LEAD-020-restore-gaps`); the owner's flag waits on BE-042. Offer **Assign** after a restore when the owner has left, as `leads.md` says; give `lead.restored` its own line in the history ("restored the lead", with the duplicate pairs it reopened).
+
+### From the backend on 5 Nov (FS-082, backend #226)
+
+- [x] **50. Team and role filters on the reports** (FS-082). PR #237, 5 Nov (`feature/RPT-006-team-filters`), stacked on #232. RPT-006. `team_of` (a person and everyone below them on the org chart) and `roles` on every report that takes a person, plus the forecast, insights and territory performance; salesperson performance gives every team member a row with role and office, zeros included. `404 not_in_your_line` outside the caller's line; never with `owner_id`. `backend/docs/api/reports.md`.
+- [x] **51. The setup check, and an office that covers no area** (FS-082). PR #238, 6 Nov (`feature/ADMN-009-setup-check`), stacked on #237. ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
+
+## Waiting on someone else
+
+- [x] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Done on the backend; picked up in PR #193, 22 Oct.
+- [x] **BE-024:** `GET /lookups/product-categories` and `/lookups/uoms` for the product form. Done on the backend; picked up in PR #193, 22 Oct.
+- [x] **BE-025:** `record_type` on `GET /documents/types`, so a lead isn't offered the dealer-application types. Done on the backend; picked up in PR #193, 22 Oct.
+- [-] **BE-039:** a quotation for a dealer or distributor with no farmer's lead. Open on the backend (can start now). The frontend then adds "New quotation for a dealer", reusing SO-012's dealer picker.
+- [-] **BE-040:** the employees who look after a dealer. Open on the backend; what it grants waits on the client. The frontend then adds the field to the partner form and "My dealers".
+- [-] **BE-041:** a leaver's leads go to their dealer. Waits on the client.
+- [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #186, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
+- [x] **F-12, the user:** yes (20 Oct), files stay locked after the QC verdict, with a **Download PDF** on the complaint like a quotation or an order. Built against the shape asked in BE-031 (CMPL-013), shown once the backend sends `pdf_state`. PR #187, 21 Oct (`feature/CMPL-013-complaint-pdf`).
+
+## Optional polish
+
+- [x] A "Deleted leads" view with `deleted=true`, for `leads.delete` holders. LEAD-019, read-only; BE-033 asks for a restore (`feature/LEAD-019-deleted-leads`).
+- [ ] The mock's quotation pricing reads `mockDb.products` and the in-force price list, rather than the six `MOCK_PRODUCTS`.
+- [ ] Dark mode: a hovered row with an avatar fails colour contrast (the avatar's 5% white background on `bg-accent`; initials below 4.5:1). Seen in New message and New group (#133). A token change in `tokens.css`, so it reaches every screen.
+
+## Done
+
+Move nothing here: tick items where they are. This section lists what was finished before this plan, for context.
+
+- **12 Oct, #109:** go-live fixes from the 10 Oct walk (APP-006).
+- **13 Oct:**
+  - #111: Excel import and price lists by sale type (MSTR-007, MSTR-008).
+  - #112: the channel partners admin (CHNL-001…005).
+  - #113: documents on leads, quotations, orders and dispatches (DOC-001…003).
+  - #114: #112 and #113 brought into `integration`.
+  - #118: the release menu (APP-007).
+- **14 Oct, #126 (not a plan item):** a dialog's close timer could start after the dialog had gone, failing CI at random (`window is not defined`). One `useCloseAfterSuccess` hook now serves eleven dialogs (APP-003); ported into #124.

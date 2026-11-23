@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Complaint {{ c.complaint_no }}</title>
+<style>
+  /* FS-074: a complaint as the caller sees it. Every value is escaped and nothing is
+     marked safe. No printing time: an unchanged complaint gives the same file. */
+  @page { size: A4 portrait; margin: 12mm 12mm 14mm 12mm;
+          @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #555; } }
+  body { font-family: "Noto Sans", "Noto Sans Gujarati", "Noto Sans Devanagari", "DejaVu Sans", sans-serif;
+         font-size: 9.5pt; color: #111; }
+  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111;
+         padding-bottom: 2mm; }
+  .top .co { font-size: 14pt; font-weight: 700; letter-spacing: .02em; }
+  .logo { height: 13mm; }
+  h1 { font-size: 13pt; margin: 4mm 0 1mm; }
+  .sub { color: #444; margin-bottom: 3mm; }
+  h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .06em; margin: 4mm 0 1.5mm; color: #333; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #888; padding: 1.2mm 1.6mm; vertical-align: top; text-align: left;
+           overflow-wrap: anywhere; }
+  th { background: #eee; font-weight: 600; font-size: 8.5pt; }
+  td.k { width: 30%; color: #333; background: #fafafa; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: #666; }
+  .prev { border-left: 3px solid #999; padding-left: 2mm; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="co">POLYSIL IRRIGATION SYSTEMS LTD.</div>
+    <img class="logo" src="{{ logo }}" alt="Polysil">
+  </div>
+  <h1>Complaint {{ c.complaint_no }}</h1>
+  <div class="sub">{{ c.complaint_type.name }} · Severity: {{ c.severity }} · Status: {{ c.status | replace("_", " ") }}{% if c.reopen_count %} · Reopened {{ c.reopen_count }} time{{ "s" if c.reopen_count > 1 }}{% endif %}</div>
+
+  <h2>Complaint</h2>
+  <table>
+    <tr><td class="k">Raised on</td><td>{{ when(c.created_at) }}</td></tr>
+    <tr><td class="k">Submitted on</td><td>{{ when(c.submitted_at) }}</td></tr>
+    {% if c.closed_at %}<tr><td class="k">Closed on</td><td>{{ when(c.closed_at) }}</td></tr>{% endif %}
+    <tr><td class="k">Contact</td><td>{{ c.contact_name }}, {{ c.contact_mobile }}</td></tr>
+    <tr><td class="k">Place</td><td>{{ c.territory.name }}</td></tr>
+    {% if c.partner %}<tr><td class="k">Dealer</td><td>{{ "Not visible to you" if c.partner.hidden else c.partner.name }}</td></tr>{% endif %}
+    {% if c.lead %}<tr><td class="k">Lead</td><td>{{ "Not visible to you" if c.lead.hidden else (c.lead.inquiry_no ~ ", " ~ c.lead.farmer_name) }}</td></tr>{% endif %}
+    {% if c.sales_order %}<tr><td class="k">Order</td><td>{{ "Not visible to you" if c.sales_order.hidden else c.sales_order.order_no }}</td></tr>{% endif %}
+    {% if c.dc_no %}<tr><td class="k">DC no</td><td>{{ c.dc_no }}</td></tr>{% endif %}
+    {% if c.supply_date %}<tr><td class="k">Supply date</td><td>{{ when(c.supply_date) }}</td></tr>{% endif %}
+    {% if c.reg_no %}<tr><td class="k">Registration no</td><td>{{ c.reg_no }}</td></tr>{% endif %}
+    {% if c.pims_no %}<tr><td class="k">PIMS no</td><td>{{ c.pims_no }}</td></tr>{% endif %}
+    <tr><td class="k">Description</td><td>{{ c.description }}</td></tr>
+  </table>
+
+  {% if c.lines %}
+  <h2>Products</h2>
+  <table>
+    <tr><th>Product</th><th class="n">Supplied</th><th class="n">Defective</th><th>Failure</th><th>Remark</th></tr>
+    {% for x in c.lines %}
+    <tr><td>{{ x.product.description }}</td><td class="n">{{ x.supplied_qty }} {{ x.uom or "" }}</td>
+        <td class="n">{{ x.defective_qty }}</td><td>{{ x.failure_frequency or "" }}</td><td>{{ x.remark or "" }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if c.check %}
+  <h2>Manager's check</h2>
+  <table>
+    <tr><td class="k">Decision</td><td>{{ "Sent to QC" if c.check.decision == "approve" else "Returned for correction" }}, {{ when(c.check.at) }}{% if c.check.by %} by {{ c.check.by.full_name }}{% endif %}</td></tr>
+    <tr><td class="k">Remark</td><td>{{ c.check.remark }}</td></tr>
+  </table>
+  {% endif %}
+
+  {% if c.quality or c.remedy %}
+  {% if previous_round %}<h2>Previous round (before reopening on {{ when(c.reopened_at) }})</h2><div class="prev">{% endif %}
+  {% if c.quality %}
+  {% if not previous_round %}<h2>QC verdict</h2>{% endif %}
+  <table>
+    <tr><td class="k">Verdict</td><td>{{ "Accepted" if c.quality.verdict == "approved" else "Rejected" }}, {{ when(c.quality.at) }}{% if c.quality.by %} by {{ c.quality.by.full_name }}{% endif %}</td></tr>
+    <tr><td class="k">Remark</td><td>{{ c.quality.remark }}</td></tr>
+    {% if c.quality.sample_received_on %}<tr><td class="k">Sample received</td><td>{{ when(c.quality.sample_received_on) }}</td></tr>{% endif %}
+    {% if c.quality.tested_on %}<tr><td class="k">Tested</td><td>{{ when(c.quality.tested_on) }}</td></tr>{% endif %}
+    {% if c.quality.field_visit_on %}<tr><td class="k">Field visit</td><td>{{ when(c.quality.field_visit_on) }}</td></tr>{% endif %}
+  </table>
+  {% endif %}
+  {% if c.remedy %}
+  {% if not previous_round %}<h2>Remedy</h2>{% endif %}
+  <table>
+    <tr><td class="k">Remedy</td><td>{{ c.remedy.kind | capitalize }}, {{ c.remedy.status | replace("_", " ") }}, chosen {{ when(c.remedy.chosen_at) }}</td></tr>
+    {% if c.remedy.refund %}<tr><td class="k">Refund</td><td>&#8377; {{ c.remedy.refund.amount }}{% if c.remedy.refund.payee_name %}, to {{ c.remedy.refund.payee_name }}{% endif %}</td></tr>{% endif %}
+    {% if c.remedy.replacement and c.remedy.replacement.order %}<tr><td class="k">Replacement order</td><td>{{ c.remedy.replacement.order.order_no or "" }}</td></tr>{% endif %}
+    {% if c.remedy.completed_at %}<tr><td class="k">Completed</td><td>{{ when(c.remedy.completed_at) }}</td></tr>{% endif %}
+  </table>
+  {% endif %}
+  {% if previous_round %}</div>{% endif %}
+  {% endif %}
+
+  {% if c.cancellation %}
+  <h2>Cancelled</h2>
+  <table><tr><td class="k">Reason</td><td>{{ c.cancellation.reason }}, {{ when(c.cancellation.at) }}</td></tr></table>
+  {% endif %}
+
+  {% if files %}
+  <h2>Files</h2>
+  <table>{% for f in files %}<tr><td>{{ f }}</td></tr>{% endfor %}</table>
+  {% endif %}
+
+  <h2>History</h2>
+  {% if omitted %}<p class="muted">Earlier history omitted ({{ omitted }} events).</p>{% endif %}
+  <table>
+    <tr><th>When</th><th>What</th><th>By</th></tr>
+    {% for e in events %}<tr><td>{{ e.when }}</td><td>{{ e.what }}</td><td>{{ e.who }}</td></tr>{% endfor %}
+  </table>
+</body>
+</html>

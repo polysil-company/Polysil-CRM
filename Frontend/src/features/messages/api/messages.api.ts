@@ -1,0 +1,222 @@
+import { z } from "zod";
+
+import { apiRequest } from "@/lib/api/client";
+import type { ApiPath } from "@/lib/api/url";
+import { createLogger } from "@/lib/logger";
+
+import {
+  conversationListResponseSchema,
+  conversationResponseSchema,
+  memberListResponseSchema,
+  markConversationReadResponseSchema,
+  messageListResponseSchema,
+  messageResponseSchema,
+  staffDirectoryResponseSchema,
+  type AddMembersRequest,
+  type Conversation,
+  type ConversationList,
+  type CreateGroupRequest,
+  type MarkConversationReadRequest,
+  type MarkConversationReadResult,
+  type Member,
+  type Message,
+  type MessagePage,
+  type Person,
+  type RenameGroupRequest,
+  type SendMessageRequest,
+  type StartConversationRequest,
+} from "./messages.schemas";
+
+const log = createLogger({ file: "features/messages/api/messages.api.ts", dataId: "MSG-001" });
+
+/** Messages loaded per conversation. TODO(MSG-002): load older messages with `nextCursor`. */
+export const MESSAGE_PAGE_SIZE = 50;
+
+/** People shown per directory search. */
+export const STAFF_DIRECTORY_LIMIT = 20;
+
+function conversationPath(conversationId: string): ApiPath {
+  return `/conversations/${encodeURIComponent(conversationId)}`;
+}
+
+/** MSG-001 · GET /conversations */
+export function listConversations(signal?: AbortSignal): Promise<ConversationList> {
+  return apiRequest({
+    dataId: "MSG-001",
+    logger: log,
+    fn: "listConversations",
+    path: "/conversations",
+    schema: conversationListResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * MSG-002 · GET /conversations/{conversationId}/messages: the newest page, oldest first.
+ * TODO(MSG-002): "Show older messages" with `meta.next_cursor`; the thread shows the latest
+ * 50 until then, which covers every conversation the demo data and early use will have.
+ */
+export function listMessages(conversationId: string, signal?: AbortSignal): Promise<MessagePage> {
+  return apiRequest({
+    dataId: "MSG-002",
+    logger: log,
+    fn: "listMessages",
+    path: `${conversationPath(conversationId)}/messages`,
+    query: { limit: MESSAGE_PAGE_SIZE },
+    schema: messageListResponseSchema,
+    signal,
+  });
+}
+
+/** MSG-003 · POST /conversations/{conversationId}/messages */
+export function sendMessage(conversationId: string, body: SendMessageRequest): Promise<Message> {
+  return apiRequest({
+    dataId: "MSG-003",
+    logger: log,
+    fn: "sendMessage",
+    method: "POST",
+    path: `${conversationPath(conversationId)}/messages`,
+    body,
+    schema: messageResponseSchema,
+  });
+}
+
+/** MSG-004 · GET /staff-directory */
+export function searchStaffDirectory(q: string, signal?: AbortSignal): Promise<readonly Person[]> {
+  return apiRequest({
+    dataId: "MSG-004",
+    logger: log,
+    fn: "searchStaffDirectory",
+    path: "/staff-directory",
+    query: { q, limit: STAFF_DIRECTORY_LIMIT },
+    schema: staffDirectoryResponseSchema,
+    signal,
+  });
+}
+
+/**
+ * MSG-004 · GET /conversations/{conversationId}: one of the user's conversations, whether or
+ * not anyone has written in it yet (BE-021). 404 when it is not theirs.
+ */
+export function getConversation(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-004",
+    logger: log,
+    fn: "getConversation",
+    path: conversationPath(conversationId),
+    schema: conversationResponseSchema,
+    signal,
+  });
+}
+
+/** MSG-004 · POST /conversations */
+export function startConversation(participantId: string): Promise<Conversation> {
+  const body: StartConversationRequest = { participant_id: participantId };
+  return apiRequest({
+    dataId: "MSG-004",
+    logger: log,
+    fn: "startConversation",
+    method: "POST",
+    path: "/conversations",
+    body,
+    schema: conversationResponseSchema,
+  });
+}
+
+/**
+ * MSG-005 · POST /conversations/{conversationId}/read, up to `upTo`: the newest message the
+ * screen shows. Null reads everything so far, for "mark all read" from the inbox only.
+ */
+export function markConversationRead(
+  conversationId: string,
+  upTo: string | null,
+): Promise<MarkConversationReadResult> {
+  const body: MarkConversationReadRequest = upTo === null ? {} : { up_to: upTo };
+  return apiRequest({
+    dataId: "MSG-005",
+    logger: log,
+    fn: "markConversationRead",
+    method: "POST",
+    path: `${conversationPath(conversationId)}/read`,
+    body,
+    schema: markConversationReadResponseSchema,
+  });
+}
+
+/** MSG-006 · POST /conversations/groups: the user is added and manages it. */
+export function createGroup(body: CreateGroupRequest): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "createGroup",
+    method: "POST",
+    path: "/conversations/groups",
+    body,
+    schema: conversationResponseSchema,
+  });
+}
+
+/** MSG-006 · PATCH /conversations/{conversationId}: the manager renames the group. */
+export function renameGroup(
+  conversationId: string,
+  body: RenameGroupRequest,
+): Promise<Conversation> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "renameGroup",
+    method: "PATCH",
+    path: conversationPath(conversationId),
+    body,
+    schema: conversationResponseSchema,
+  });
+}
+
+/** MSG-006 · GET /conversations/{conversationId}/members: everyone who has been in it. */
+export function listMembers(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<readonly Member[]> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "listMembers",
+    path: `${conversationPath(conversationId)}/members`,
+    schema: memberListResponseSchema,
+    signal,
+  });
+}
+
+/** MSG-006 · POST /conversations/{conversationId}/members: any member adds colleagues. */
+export function addMembers(
+  conversationId: string,
+  body: AddMembersRequest,
+): Promise<readonly Member[]> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "addMembers",
+    method: "POST",
+    path: `${conversationPath(conversationId)}/members`,
+    body,
+    schema: memberListResponseSchema,
+  });
+}
+
+/**
+ * MSG-006 · DELETE /conversations/{conversationId}/members/{userId}: the user's own id leaves the
+ * group; another's is the manager removing them.
+ */
+export function removeMember(conversationId: string, userId: string): Promise<undefined> {
+  return apiRequest({
+    dataId: "MSG-006",
+    logger: log,
+    fn: "removeMember",
+    method: "DELETE",
+    path: `${conversationPath(conversationId)}/members/${encodeURIComponent(userId)}`,
+    schema: z.undefined(),
+  });
+}

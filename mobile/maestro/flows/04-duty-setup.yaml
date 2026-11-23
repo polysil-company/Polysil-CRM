@@ -1,0 +1,76 @@
+# Duty · Grants what Duty needs, one card at a time, through Android's own screens.
+# Needs a staff account whose role tracks (a field officer or a manager).
+appId: com.polysil.crm
+tags: [duty]
+---
+- launchApp:
+    permissions:
+      location: allow
+      notifications: allow
+- runFlow:
+    when:
+      visible: "Sign in"
+    file: ../common/sign-in.yaml
+- runFlow:
+    file: ../common/open-page.yaml
+    env:
+      PAGE: "Duty"
+# The consent screen appears once per policy version.
+- runFlow:
+    when:
+      visible: "Before you go on duty"
+    commands:
+      - tapOn: "Accept"
+      - extendedWaitUntil:
+          visible: "Go on duty"
+          timeout: 20000
+- extendedWaitUntil:
+    visible: "Go on duty|Go off duty"
+    timeout: 30000
+- takeScreenshot: 04-duty-before
+# Location while using the app.
+- runFlow:
+    when:
+      visible: "Allow location"
+    commands:
+      - tapOn:
+          text: "Allow location"
+          index: 1
+      - tapOn:
+          text: "While using the app|Allow only while using the app|Allow"
+          optional: true
+# "Allow all the time" opens the app's location setting.
+- runFlow:
+    when:
+      visible: 'Set location to "Allow all the time"'
+    commands:
+      - tapOn: "Open the setting"
+      - tapOn:
+          text: "Allow all the time"
+          optional: true
+      - back
+# Battery optimisation off: Android asks in a dialog.
+- runFlow:
+    when:
+      visible: "Turn battery optimisation off for Polysil"
+    commands:
+      - tapOn: "Open the setting"
+      - tapOn:
+          text: "Allow"
+          optional: true
+- runFlow:
+    when:
+      visible: "Allow notifications"
+    commands:
+      - tapOn:
+          text: "Allow notifications"
+          index: 1
+      - tapOn:
+          text: "Allow"
+          optional: true
+- waitForAnimationToEnd
+- takeScreenshot: 04-duty-after-setup
+# Nothing left to grant: these cards are gone.
+- assertNotVisible: 'Set location to "Allow all the time"'
+- assertNotVisible: "Turn battery optimisation off for Polysil"
+- assertNotVisible: "Turn on location \\(GPS\\)"

@@ -1,0 +1,101 @@
+---
+date: 2026-09-14
+type: feature
+title: Frontend foundation — design system, app shell, dashboard, leads and quality gates
+dataIds:
+  - APP-001
+  - APP-002
+  - APP-003
+  - APP-004
+  - OBS-001
+  - OBS-002
+  - DS-001
+  - AUTH-002
+  - LEAD-001
+  - LEAD-002
+  - LEAD-003
+  - LEAD-004
+  - RPT-001
+  - REPO-001
+  - REPO-002
+author: Nakul Srivastava
+breaking: false
+---
+
+## Before
+
+The repository held planning documents only, written for an earlier and wider scope (three applications, authorisation in the database). There was no application code, no design system, no test setup and no tooling. The current scope — the web frontend only, with a separate backend developer — is described in `Docs/Frontend-Scope.md`.
+
+## Now
+
+A foundation for the web frontend that runs end to end against a mocked API.
+
+### Design system
+
+- One token file, `src/styles/tokens.css`, holds every design decision for light and dark mode: colour ("water and sun" — sand and ink neutrals, teal actions, sun-yellow selection), type scale, one radius knob, borders, shadows, control sizes, stacking layers and motion. `Docs/Design-System.md` explains it.
+- Tailwind's default palette and scales are switched off and lint rejects arbitrary values, so a token change reaches every screen.
+- shadcn/ui components rebuilt on Base UI and restyled to the tokens, plus patterns: DataTable, QueryView, StatCard, ErrorState with a copyable reference, FilterPill, SearchField, SegmentedMeter, Sparkline and TagList.
+- An async Button with a circular loader, determinate progress, and success and failure states.
+- Storybook stories for the tokens and every reusable component, checked for accessibility.
+
+### App
+
+- App shell: role-filtered sidebar, header, mobile navigation, command menu (Ctrl or ⌘ + K), light, dark and system theme, directional page transitions, and skeletons that mirror each page.
+- Dashboard: key figures, pipeline by stage, follow-ups due and lead sources.
+- Leads: a table filtered, sorted and paginated on the server with the state in the URL; row selection with a value summary; lead detail; and a New lead dialog with field validation and server-side field errors.
+- Every data view handles loading, empty, error (with a reference and a retry when it can help), stale data and contract violations.
+
+### Platform
+
+- API client with request IDs, Data ID headers, timeouts, cancellation, response validation and one error type.
+- Logger in the File → Function → Request → Response format, with automatic redaction and a runtime log level (`LOG_LEVEL`, overridable in one browser).
+- Data ID registry shared with the backend. Feature, staging and production environments with validated variables.
+- Mock API (MSW) with a role switcher and data scenarios: realistic, slow, empty, error and contract violation.
+
+### Quality gates
+
+- Strict TypeScript; ESLint rules for tokens, import layers, logger paths, test names and accessibility; Prettier; commitlint; git hooks.
+- Unit and component tests, Playwright smoke tests and a CI workflow.
+- This changelog system, and `AGENTS.md` with the rules for every contributor.
+
+## Discussion
+
+- **Frontend only.** The backend developer owns the API. Every endpoint the screens use is mocked from a Zod contract and registered as a Data ID, so integration is screen by screen: point at the staging API and follow the checklist in `Docs/Environments.md`.
+- **shadcn/ui on Base UI (base-nova), restyled by hand.** `shadcn add` would also install packages we do not want (`next-themes` and a `cn` package), so each component was taken from its source and moved onto the tokens. Theme switching uses a small store of our own.
+- **Tailwind defaults off.** Only token classes exist, which makes the design system enforceable rather than advisory. `tw-animate-css` was removed; enter and exit animations use Base UI's starting and ending style attributes.
+- **Motion** follows Emil Kowalski's rules: nothing animates on high-frequency or keyboard actions, strong ease-out curves, a 300ms ceiling, and reduced motion is honoured.
+- **Versions are pinned exactly.** ESLint stays on 9.39 because several plugins do not support ESLint 10 yet. jsdom stays on 29 because 30 needs Node 24.15. Lint plugins that `eslint-config-next` already brings in (React hooks, typescript-eslint) are not listed again, and `npm run knip` reports unused files, exports and dependencies.
+- **The ₹ sign renders in Geist.** The self-hosted Geist and Geist Mono files from the production build both contain the ₹ glyph, so amounts never fall back to a system font.
+- **The channel partner role name** (`channel_partner`, with the types distributor, dealer and sub-dealer) is a placeholder until the client confirms it.
+- **Runs from a monorepo folder too.** The same project is also committed to a folder of the Polysil-CRM monorepo. The changelog check only looks at files inside the project folder, so backend commits never need a frontend entry. Git hooks and the CI workflow only run from a repository root, so in the monorepo they stay inactive until the team enables them there.
+- **Still open:** the typeface, logo and brand colour need the client's agreement; approval thresholds and permissions will come from the backend through `GET /me`; the error format (RFC 9457 proposed) and the money unit need agreement with the backend developer; remote log shipping is not chosen yet (OBS-001).
+
+## Files changed
+
+- `AGENTS.md`, `CLAUDE.md`, `README.md` — contributor rules and project overview
+- `Docs/Design-System.md`, `Docs/Frontend-Architecture.md`, `Docs/Frontend-Scope.md`, `Docs/Data-IDs.md`, `Docs/Logging.md`, `Docs/Environments.md` — frontend documentation; the previous `Docs/AGENTS.md` moved to `Docs/archive/pre-pivot/`
+- `Docs/Contexttill6Sept2026.md` — snapshot of the project before the September pivot; `Docs/Issues.md` — ISS-022 corrected: Depot and Institutional Sales are named in the BRD but never defined
+- `src/styles/tokens.css`, `src/app/globals.css` — design tokens
+- `src/components/ui/` — primitives, with stories
+- `src/components/patterns/` — composed components, with stories
+- `src/components/layout/`, `src/components/providers/` — app shell and providers
+- `src/features/session/`, `src/features/leads/`, `src/features/dashboard/` — contracts, API functions, queries and screens
+- `src/app/` — routes, layouts, and loading, error and not-found pages
+- `src/lib/` — API client, logger, Data IDs, environment, formatting, roles and permissions, theme and motion tokens
+- `src/hooks/` — async actions, keyboard shortcuts, clipboard and a shared clock
+- `src/mocks/`, `public/mockServiceWorker.js` — MSW handlers, seeded data and scenarios
+- `src/proxy.ts` — runtime log level cookie
+- `src/test/`, `vitest.config.mts`, `vitest.setup.ts`, `e2e/`, `playwright.config.ts` — test setup
+- `.storybook/` — Storybook configuration
+- `scripts/changelog/`, `changelog/` — changelog tooling, template and this entry
+- `eslint.config.mjs`, `eslint-rules/` — lint configuration and project rules
+- `.github/` — CI workflow and pull request template
+- `package.json`, `package-lock.json`, `.npmrc`, `.nvmrc`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `components.json`, `knip.json`, `.prettierrc.json`, `.prettierignore`, `.editorconfig`, `.gitignore`, `.env.example`, `.vscode/`, `.husky/`, `commitlint.config.mjs`, `lint-staged.config.mjs` — project configuration
+
+## Tests
+
+- **Builds:** `npm run build` passes with no warnings. `npm run storybook:build` passes (Vite notes some large chunks) and indexes 93 stories from 27 files.
+- **Unit and component** (`npm test`, 178 tests in 23 files, all passing): logger and redaction `[OBS-001]`; API client, URLs and error messages `[OBS-002]`; environment variables, formatting, class merging, motion tokens and theme; permissions `[AUTH-002]`; the Data ID registry; async actions and keyboard shortcuts; Button, QueryView, ErrorState, DataTable and data display components `[DS-001]`; navigation `[APP-001]`; leads API, table states and the New lead dialog `[LEAD-001]` to `[LEAD-004]`; mock data; changelog tooling `[REPO-001]`.
+- **Stories** (`npm run test:storybook`): every story renders in Chromium with accessibility checks. Not run yet — it needs `npx playwright install chromium`.
+- **End to end** (`npm run test:e2e`): root redirect, command menu, dashboard key figures, lead list to detail and back, filters restored from the URL, and axe checks on both pages. Not run yet.
+- **By hand:** `npm run dev`, switch roles and data scenarios from the user menu, and check phone and desktop widths in light and dark.

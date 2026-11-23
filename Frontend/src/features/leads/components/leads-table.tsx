@@ -1,0 +1,221 @@
+"use client";
+
+import {
+  ArrowLeft01Icon,
+  Delete02Icon,
+  FilterRemoveIcon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
+import type { PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table";
+import { useState } from "react";
+import type * as React from "react";
+
+import { DataTable, DataTableSkeleton, SelectionBar } from "@/components/patterns/data-table";
+import { EmptyState } from "@/components/patterns/empty-state";
+import { QueryView } from "@/components/patterns/query-view";
+import { Button } from "@/components/ui/button";
+import { leadListQueryOptions } from "@/features/leads/api/leads.queries";
+import { LEAD_SORT_FIELDS, type LeadSortField } from "@/features/leads/api/leads.schemas";
+import { useLeadListParams } from "@/features/leads/hooks/use-lead-list-params";
+import {
+  LEAD_COLUMN_LAYOUT,
+  LEADS_EMPTY_FRAME_CLASSES,
+  LEADS_TABLE_FRAME_CLASSES,
+  LEADS_TABLE_LABEL,
+} from "@/features/leads/lib/lead-table-layout";
+import { readFieldErrors } from "@/lib/api/errors";
+import { formatInrCompact, sumRupees } from "@/lib/format";
+
+import { deletedLeadColumns, leadColumns } from "./leads-columns";
+
+/**
+ * Columns that can carry a sort; the backend sorts `GET /leads` since BE-001. "createdAt" (the
+ * default order, newest first) has no column.
+ */
+const SORTABLE_COLUMNS: readonly LeadSortField[] = ["customerName", "estimatedValue"];
+
+const EMPTY_SELECTION: RowSelectionState = {};
+
+export function LeadsTableSkeleton(): React.JSX.Element {
+  return (
+    <DataTableSkeleton
+      label={LEADS_TABLE_LABEL}
+      columns={LEAD_COLUMN_LAYOUT}
+      checkboxColumn={0}
+      className={LEADS_TABLE_FRAME_CLASSES}
+    />
+  );
+}
+
+/** The backend refused the page cursor in the URL: an old or edited link. */
+function isRejectedCursor(error: unknown): boolean {
+  return readFieldErrors(error)?.cursor !== undefined;
+}
+
+/**
+ * LEAD-001. Every state: skeleton on first load; error with retry and reference; empty with
+ * and without filters; a page link that no longer works; and the table. Background refetches
+ * keep rows visible.
+ */
+export function LeadsTable(): React.JSX.Element {
+  const {
+    params,
+    pageIndex,
+    setSort,
+    nextPage,
+    previousPage,
+    firstPage,
+    setPageSize,
+    resetFilters,
+    activeFilterCount,
+  } = useLeadListParams();
+  const query = useQuery(leadListQueryOptions(params));
+
+  // Selection belongs to one exact list (filters + sort + page); any change clears it.
+  const listKey = JSON.stringify(params);
+  const [selection, setSelection] = useState<{ listKey: string; rows: RowSelectionState }>({
+    listKey,
+    rows: EMPTY_SELECTION,
+  });
+  const rowSelection = selection.listKey === listKey ? selection.rows : EMPTY_SELECTION;
+
+  const sorting: SortingState = SORTABLE_COLUMNS.includes(params.sort)
+    ? [{ id: params.sort, desc: params.order === "desc" }]
+    : [];
+
+  const handleSortingChange = (next: SortingState): void => {
+    const first = next[0];
+    if (first === undefined) {
+      setSort("createdAt", "desc");
+      return;
+    }
+    const field = LEAD_SORT_FIELDS.find((candidate) => candidate === first.id);
+    if (field !== undefined) {
+      setSort(field, first.desc ? "desc" : "asc");
+    }
+  };
+
+  const firstPageAction = (
+    <Button variant="outline" size="sm" onClick={firstPage}>
+      Go to the first page
+    </Button>
+  );
+
+  if (query.status === "error" && isRejectedCursor(query.error)) {
+    return (
+      <EmptyState
+        icon={ArrowLeft01Icon}
+        title="This page link no longer works"
+        description="The link points to a page of an older list. Start again from the first page."
+        action={firstPageAction}
+        className={LEADS_EMPTY_FRAME_CLASSES}
+      />
+    );
+  }
+
+  return (
+    <QueryView
+      query={query}
+      pending={<LeadsTableSkeleton />}
+      isEmpty={(data) => data.items.length === 0 && pageIndex === 0}
+      empty={
+        // LEAD-019 · Filters narrow the deleted list too, so "no matches" still comes first.
+        activeFilterCount === 0 && params.deleted === true ? (
+          <EmptyState
+            icon={Delete02Icon}
+            title="No deleted leads"
+            description="Leads deleted from their page appear here. Only people who may delete leads see this list."
+            className={LEADS_EMPTY_FRAME_CLASSES}
+          />
+        ) : activeFilterCount > 0 ? (
+          <EmptyState
+            icon={FilterRemoveIcon}
+            title="No leads match these filters"
+            description="Remove a filter, or search for a different name, mobile number or inquiry number."
+            action={
+              <Button variant="outline" size="sm" onClick={resetFilters}>
+                Clear filters
+              </Button>
+            }
+            className={LEADS_EMPTY_FRAME_CLASSES}
+          />
+        ) : (
+          <EmptyState
+            icon={UserAdd01Icon}
+            title="No leads yet"
+            description="Leads you can work on appear here as they are captured: from WhatsApp, the website, QR codes and field visits."
+            className={LEADS_EMPTY_FRAME_CLASSES}
+          />
+        )
+      }
+    >
+      {(data) => {
+        if (data.items.length === 0) {
+          // Only reachable past the first page: the list shrank since the link was made.
+          return (
+            <EmptyState
+              icon={ArrowLeft01Icon}
+              title="This page is empty"
+              description="The leads that were here have moved or closed. Start again from the first page."
+              action={firstPageAction}
+              className={LEADS_EMPTY_FRAME_CLASSES}
+            />
+          );
+        }
+
+        const selectedLeads = data.items.filter((lead) => rowSelection[lead.id] === true);
+        const selectedValue = sumRupees(selectedLeads.map((lead) => lead.estimatedValue));
+
+        // While a new page loads, the rows (and their cursor) still belong to the previous
+        // page: moving again would skip a page, so paging waits for the real data.
+        const pageLoading = query.isPlaceholderData;
+
+        const handlePaginationChange = (next: PaginationState): void => {
+          if (pageLoading) {
+            return;
+          }
+          if (next.pageSize !== params.pageSize) {
+            setPageSize(next.pageSize);
+          } else if (next.pageIndex > pageIndex && data.nextCursor !== null) {
+            nextPage(data.nextCursor);
+          } else if (next.pageIndex < pageIndex) {
+            previousPage();
+          }
+        };
+
+        return (
+          <>
+            <DataTable
+              label={LEADS_TABLE_LABEL}
+              columns={params.deleted === true ? deletedLeadColumns : leadColumns}
+              data={data.items}
+              getRowId={(lead) => lead.id}
+              rowCount={data.total}
+              rowCountCapped={data.totalCapped}
+              hasNextPage={data.nextCursor !== null}
+              isPaging={pageLoading}
+              sorting={sorting}
+              onSortingChange={handleSortingChange}
+              pagination={{ pageIndex, pageSize: params.pageSize }}
+              onPaginationChange={handlePaginationChange}
+              rowSelection={rowSelection}
+              onRowSelectionChange={(rows) => {
+                setSelection({ listKey, rows });
+              }}
+              isFetching={query.isFetching}
+              className={LEADS_TABLE_FRAME_CLASSES}
+            />
+            <SelectionBar
+              count={selectedLeads.length}
+              summary={`${formatInrCompact(selectedValue)} estimated on this page`}
+              onClear={() => {
+                setSelection({ listKey, rows: EMPTY_SELECTION });
+              }}
+            />
+          </>
+        );
+      }}
+    </QueryView>
+  );
+}

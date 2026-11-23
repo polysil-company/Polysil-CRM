@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>
+  /* FS-071: the client's "Dealer Data Sheet", in its order. Every value is escaped;
+     a blank sheet prints the same boxes empty for filling by hand. */
+  @page { size: A4 portrait; margin: 12mm 12mm 14mm 12mm;
+          @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #555; } }
+  body { font-family: "Noto Sans", "Noto Sans Gujarati", "Noto Sans Devanagari", "DejaVu Sans", sans-serif;
+         font-size: 9.5pt; color: #111; }
+  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111;
+         padding-bottom: 2mm; }
+  .top .co { font-size: 14pt; font-weight: 700; letter-spacing: .02em; }
+  .logo { height: 13mm; }
+  h1 { text-align: center; font-size: 13pt; letter-spacing: .12em; margin: 4mm 0 3mm; text-decoration: underline; }
+  h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .06em; margin: 4mm 0 1.5mm; color: #333; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #888; padding: 1.2mm 1.6mm; vertical-align: top; text-align: left; }
+  th { background: #eee; font-weight: 600; font-size: 8.5pt; }
+  td.k { width: 30%; color: #333; background: #fafafa; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  td.blank { height: 6mm; }
+  .note { font-size: 8pt; color: #555; margin-top: 1mm; }
+  .decl { margin-top: 5mm; line-height: 1.6; }
+  .sign { display: flex; justify-content: space-between; margin-top: 12mm; gap: 10mm; }
+  .sign div { flex: 1; }
+  .sign .line { border-top: 1px solid #111; margin-top: 14mm; padding-top: 1mm; }
+  .stamp { margin-top: 2mm; color: #555; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="co">POLYSIL IRRIGATION SYSTEMS LTD.</div>
+    <img class="logo" src="{{ logo }}" alt="Polysil">
+  </div>
+  <h1>{{ heading }}</h1>
+
+  <table>
+    <tr><td class="k">Name of the Company or M/s.</td><td colspan="3">{{ s.firm_name }}</td></tr>
+    <tr><td class="k">Office Address</td><td colspan="3">{{ s.address }}{% if s.pincode %} - {{ s.pincode }}{% endif %}</td></tr>
+    <tr><td class="k">Godown Address</td><td colspan="3">{{ s.godown_address }}</td></tr>
+    <tr><td class="k">Contact Person</td><td>{{ s.contact_name }}</td><td class="k">Mobile No.</td><td>{{ s.mobile }}</td></tr>
+    <tr><td class="k">Telephone / Fax</td><td>{{ s.telephone }}</td><td class="k">Email</td><td>{{ s.email }}</td></tr>
+    <tr><td class="k">GSTIN</td><td>{{ s.gstin }}</td><td class="k">PAN No.</td><td>{{ s.pan }}</td></tr>
+    <tr><td class="k">Constitution</td><td>{{ s.firm_type }}</td><td class="k">Date of Establishment</td><td>{{ s.established_on }}</td></tr>
+  </table>
+
+  <h2>Bank</h2>
+  <table>
+    <tr><td class="k">Name of Bank</td><td>{{ s.bank_name }}</td><td class="k">Branch</td><td>{{ s.bank_branch }}</td></tr>
+    <tr><td class="k">Account Name</td><td>{{ s.bank_account_name }}</td><td class="k">Account No.</td><td>{{ s.bank_account_no }}</td></tr>
+    <tr><td class="k">IFSC</td><td>{{ s.bank_ifsc }}</td><td class="k">Address</td><td>{{ s.bank_address }}</td></tr>
+  </table>
+
+  <h2>Working capital facilities from the bank</h2>
+  <table>
+    <tr><th>Nature of facility</th><th class="n">Rs. (in lakhs)</th></tr>
+    {% for row in s.working_capital %}
+    <tr><td>{{ row.facility }}</td><td class="n">{{ row.amount_lakhs }}</td></tr>
+    {% endfor %}
+    {% for _ in range(s.blank_capital) %}<tr><td class="blank"></td><td></td></tr>{% endfor %}
+    <tr><td>Other sources</td><td class="n">{{ s.other_sources_lakhs }}</td></tr>
+    <tr><th>Total amount</th><th class="n">{{ s.working_capital_total_lakhs }}</th></tr>
+  </table>
+
+  <h2>Vehicles and premises</h2>
+  <table>
+    <tr><td class="k">Two wheelers (Nos.)</td><td>{{ s.two_wheelers }}</td><td class="k">Jeeps / cars (Nos.)</td><td>{{ s.cars }}</td></tr>
+    <tr><td class="k">Others (specify)</td><td colspan="3">{{ s.other_vehicles }}</td></tr>
+    <tr><td class="k">Office area ({{ s.unit }})</td><td>{{ s.office_area }}</td><td class="k">Godown area ({{ s.unit }})</td><td>{{ s.godown_area }}</td></tr>
+  </table>
+
+  <h2>Manpower</h2>
+  <table>
+    <tr><th>Category</th><th>Qualification</th><th>Type of work</th><th class="n">Experience (years)</th><th class="n">No. of people</th></tr>
+    {% for row in s.manpower %}
+    <tr><td>{{ row.category }}</td><td>{{ row.qualification }}</td><td>{{ row.work_type }}</td>
+        <td class="n">{{ row.experience_years }}</td><td class="n">{{ row.people }}</td></tr>
+    {% endfor %}
+    {% for _ in range(s.blank_manpower) %}<tr><td class="blank"></td><td></td><td></td><td></td><td></td></tr>{% endfor %}
+  </table>
+
+  <h2>Previous installations</h2>
+  <table>
+    <tr><th class="n">Sr.</th><th class="n">Year</th><th class="n">Customers</th><th>Description of project</th>
+        <th>Scope of work</th><th class="n">Total cost (Rs. lakhs)</th></tr>
+    {% for row in s.previous_installations %}
+    <tr><td class="n">{{ loop.index }}</td><td class="n">{{ row.year }}</td><td class="n">{{ row.customers }}</td>
+        <td>{{ row.description }}</td><td>{{ row.scope }}</td><td class="n">{{ row.cost_lakhs }}</td></tr>
+    {% endfor %}
+    {% for _ in range(s.blank_installations) %}<tr><td class="blank"></td><td></td><td></td><td></td><td></td><td></td></tr>{% endfor %}
+  </table>
+
+  <table style="margin-top: 3mm">
+    <tr><td class="k">Sales executives / surveyors (Nos.)</td><td>{{ s.sales_executives }}</td>
+        <td class="k">Technicians / fitters (Nos.)</td><td>{{ s.technicians }}</td></tr>
+  </table>
+
+  <div class="decl">
+    {# code review F-6: only a recorded payment is declared as paid #}
+    We declare that the above information is true and correct,
+    {% if s.deposit_kind == "not_required" %}that no deposit is required{% elif s.deposit_kind == "waived" %}that the deposit of
+    Rs. <b>{{ s.deposit_text }}</b> was waived by the company{% else %}and that a deposit of
+    Rs. <b>{{ s.deposit_text }}</b> has been paid to the company{% endif %} on appointment as
+    <b>{{ s.role_word }}</b> at <b>{{ s.appointment_place or "________________" }}</b>
+    of District <b>{{ s.district or "________________" }}</b>, State <b>{{ s.state or "________________" }}</b>.
+    {% if s.deposit_note %}<div class="note">{{ s.deposit_note }}</div>{% endif %}
+  </div>
+
+  <div class="sign">
+    <div>
+      <div class="line">Signature</div>
+      <div class="stamp">Name: ____________________ &nbsp; Designation: ____________________</div>
+      <div class="stamp">Date: ____________ &nbsp; Address stamp</div>
+    </div>
+    <div>
+      <div class="line">For Polysil Irrigation Systems Ltd.<br>Signatory authority</div>
+    </div>
+  </div>
+</body>
+</html>
