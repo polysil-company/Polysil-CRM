@@ -188,5 +188,35 @@ def pdf_storage_key(order_id: str, lease: str) -> str:
     return f"orders/{order_id}/{lease}.pdf"
 
 
-def pdf_filename(order_no: str) -> str:
-    return f"{_UNSAFE.sub('-', order_no).strip('-')}.pdf"
+# migration 092's cap on the internal copy's renders, as for the customer copy
+MAX_INTERNAL_RENDER_ATTEMPTS = 5
+
+
+def internal_pdf_storage_key(order_id: str, lease: str, nonce: str) -> str:
+    """The staff-only copy with the approval trail (FS-091), beside the customer's.
+    The nonce keeps it from being derived from the customer copy's key, which a
+    dealer's link carries (plan review R-2)."""
+    return f"orders/{order_id}/{lease}-{nonce}-internal.pdf"
+
+
+def internal_pdf_state(pdf_state: str | None, internal_key: str | None,
+                       internal_attempts: int, *, leased: bool = False,
+                       cancelled: bool = False) -> str:
+    """What the staff "Download internal copy" button shows (FS-091 §7): the
+    customer copy's state until that is ready, then the internal copy's own.
+    The fifth attempt is charged when it is claimed, so it is failed only once no
+    render holds the lease (code review F-2). A cancelled order is never rendered
+    (EC-5), so it is none, not pending for good (F-4)."""
+    if cancelled or pdf_state in (None, "none"):
+        return "none"
+    if pdf_state != "ready":
+        return "failed" if pdf_state == "failed" else "pending"
+    if internal_key:
+        return "ready"
+    if internal_attempts >= MAX_INTERNAL_RENDER_ATTEMPTS and not leased:
+        return "failed"
+    return "pending"
+
+
+def pdf_filename(order_no: str, *, internal: bool = False) -> str:
+    return f"{_UNSAFE.sub('-', order_no).strip('-')}{'-internal' if internal else ''}.pdf"

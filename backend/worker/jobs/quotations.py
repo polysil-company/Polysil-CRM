@@ -108,6 +108,16 @@ def _date(v: Any) -> str:
     return dt.date.fromisoformat(s).strftime("%d %b %Y")
 
 
+def _datetime(v: Any) -> str:
+    """A timestamp on the IST clock, "20 Nov 2026, 14:05"; empty for none (FS-091)."""
+    if not v:
+        return ""
+    stamp = dt.datetime.fromisoformat(str(v))
+    if stamp.tzinfo is not None:
+        stamp = stamp.astimezone(IST)
+    return stamp.strftime("%d %b %Y, %H:%M")
+
+
 def _mobile(v: Any) -> str:
     """An Indian mobile as people write it: +91 80858 10855, not +918085810855
     (walk F-15). Anything else prints as given."""
@@ -119,7 +129,7 @@ def _mobile(v: Any) -> str:
 
 
 _env.filters.update(money=_money, rupees=_rupees, pct=_plain, qty=_plain, date=_date,
-                    mobile=_mobile)
+                    datetime=_datetime, mobile=_mobile)
 # the client's logo with its black background knocked out; a data URI, so the
 # renderer needs no file access (walk F-15, client item 5)
 _env.globals["logo"] = "data:image/png;base64," + base64.b64encode(

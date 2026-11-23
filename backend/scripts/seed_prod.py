@@ -34,12 +34,12 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.generate_permission_seed import load_grants  # noqa: E402
 
-# Go-live scope: leads, quotations, sales orders with approvals and
-# dispatch, tasks, users and roles, offices, territories and dealers, products and
-# price lists, staff messages, location tracking, reports. The dashboard and the bell need no
-# module.
+# Go-live scope: every module in the permission matrix (full release, 23 Nov 2026).
+# The dashboard and the bell need no module.
 RELEASED = ("leads", "quotations", "sales_orders", "dispatch", "tasks", "users", "masters",
-            "partners", "products", "pricing", "chat", "tracking", "reports")
+            "partners", "products", "pricing", "chat", "tracking", "reports",
+            "subsidy", "complaints", "targets", "payments", "stock", "schemes", "rewards",
+            "marketing_material", "campaigns")
 
 # seed_demo's sixteen roles, verbatim: the matrix names them
 ROLES: list[tuple[str, str, int, bool, bool]] = [

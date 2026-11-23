@@ -45,11 +45,19 @@ async def only_these_render(sessions: Callable[[], AsyncSession], table: str,
     assert table in ("quotation", "sales_order")
     s = sessions()
     moved: list[str] = []
+    owing: list[str] = []
     try:
         moved = [str(x) for x in (await s.execute(text(
             f"UPDATE {table} SET pdf_next_attempt_at = pdf_next_attempt_at + interval '100 years' "
             "WHERE pdf_state = 'pending' AND pdf_next_attempt_at IS NOT NULL "
             "AND id <> ALL(CAST(:i AS uuid[])) RETURNING id"), {"i": ids})).scalars().all()]
+        if table == "sales_order":
+            # FS-091: a ready order owing its internal copy is claimed once nothing is
+            # pending; past the attempt cap, it is not
+            owing = [str(x) for x in (await s.execute(text(
+                "UPDATE sales_order SET pdf_internal_attempts = pdf_internal_attempts + 1000 "
+                "WHERE pdf_state = 'ready' AND pdf_internal_key IS NULL "
+                "AND id <> ALL(CAST(:i AS uuid[])) RETURNING id"), {"i": ids})).scalars().all()]
         await s.commit()
         yield
     finally:
@@ -58,6 +66,11 @@ async def only_these_render(sessions: Callable[[], AsyncSession], table: str,
                 f"UPDATE {table} SET pdf_next_attempt_at = "
                 "pdf_next_attempt_at - interval '100 years' "
                 "WHERE id = ANY(CAST(:i AS uuid[]))"), {"i": moved})
+        if owing:
+            await s.execute(text(
+                "UPDATE sales_order SET pdf_internal_attempts = pdf_internal_attempts - 1000 "
+                "WHERE id = ANY(CAST(:i AS uuid[]))"), {"i": owing})
+        if moved or owing:
             await s.commit()
         await s.close()
 

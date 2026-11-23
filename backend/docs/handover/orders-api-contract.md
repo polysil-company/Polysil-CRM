@@ -152,7 +152,7 @@ role the order is waiting for).
   "last_rejection": null,
   "dispatches": [],
   "warnings": [],
-  "pdf_state": "none", "pdf_error": null, "confirmation": null,
+  "pdf_state": "none", "pdf_error": null, "pdf_internal_state": null, "confirmation": null,
   "submitted_at": null, "approved_at": null, "cancelled_at": null, "created_at": "…"
 }
 ```
@@ -219,6 +219,28 @@ page load.
 The PDF prints the order number, the approval date, the seller, the buyer, delivery and
 place of supply, every line with its discounts and tax, the totals and the payment
 terms. It never prints approver names or remarks.
+
+**The internal copy (FS-091, added 23 Nov).** `?copy=internal` returns a second PDF,
+for staff only: the same order with "Internal copy. Not for the customer." on every
+page, the order's remarks, the amend reason, and an approval trail. The trail lists
+every round (including one returned for changes), and for each step the role, who
+decided, the decision, the date and time, and the remark.
+
+| `copy` | Who | Filename |
+|---|---|---|
+| `customer` (default) | staff and dealers | `<order no>.pdf` |
+| `internal` | staff only; a dealer gets `403 insufficient_permission` | `<order no>-internal.pdf` |
+
+Show the button from the order's `pdf_internal_state` (null for a dealer):
+
+| `pdf_internal_state` | Show |
+|---|---|
+| `ready` | "Download internal copy", beside "Download PDF" |
+| `pending` | "Preparing internal copy" (orders approved before 23 Nov get theirs in the background) |
+| `failed`, `none` | no button |
+
+`?copy=internal` answers `409 pdf_pending` while it is being made and `409 pdf_failed`
+(with `fields.pdf_error`) if it gave up. The customer copy is not affected either way.
 
 ### `GET /api/v1/orders/{id}/timeline`
 
@@ -320,7 +342,7 @@ For an approved or partly dispatched order.
 |---|---|---|
 | Order list | everyone with orders | status chips, dispatched bar, "waiting on", provisional badge |
 | New order | officer, manager, dealer | pick accepted quotations that agree, or type lines; price date only for a direct order; live figures from `POST /pricing/quote-lines`; show `repriced` warnings |
-| Order detail | everyone | lines with sent / short / open, the chain as a stepper, the last rejection while in draft, dispatches, timeline; actions by status and permission; "Download PDF" when `pdf_state` is `ready`, "Preparing PDF" while `pending`; a "No mobile: call the buyer" note when `confirmation` is `no_mobile` |
+| Order detail | everyone | lines with sent / short / open, the chain as a stepper, the last rejection while in draft, dispatches, timeline; actions by status and permission; "Download PDF" when `pdf_state` is `ready`, "Preparing PDF" while `pending`; for staff, "Download internal copy" when `pdf_internal_state` is `ready` (FS-091); a "No mobile: call the buyer" note when `confirmation` is `no_mobile` |
 | My approvals | every approver | the queue, a stalled badge, an "include lower steps" toggle for managers, approve or reject with remark |
 | Dispatch entry | Dispatch Manager | open quantities pre-filled per line; DC and invoice fields; warnings shown, not blocking |
 | Approval thresholds | admin | the bands per role and territory |

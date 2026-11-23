@@ -593,12 +593,14 @@ async def test_the_order_pdf_follows_approval_and_is_withdrawn_on_cancel(
     assert link["filename"] == order["order_no"].replace("/", "-") + ".pdf"
     assert "/public/files/" in link["url"]
     files = list(tmp_path.rglob(f"orders/{order['id']}/*.pdf"))
-    assert len(files) == 1
-    body = files[0].read_bytes()
+    # FS-091: the customer copy and the staff-only internal copy
+    assert len(files) == 2
+    body = next(f for f in files if not f.name.endswith("-internal.pdf")).read_bytes()
+    internal = next(f for f in files if f.name.endswith("-internal.pdf")).read_bytes()
     assert order["order_no"].encode() in body and b"Rameshbhai Patel" in body
-    # rule 9: the order's own remark is internal (code review F-6: the approvers'
-    # remarks never reach the claim, so only this one can leak)
+    # rule 9: the order's own remark is internal; only the internal copy prints it
     assert b"rate agreed below list" not in body
+    assert b"rate agreed below list" in internal and b"Approval trail" in internal
 
     hs = await _as(client, shop, "state_manager")
     r = await client.post(f"{V1}/orders/{order['id']}/cancel",

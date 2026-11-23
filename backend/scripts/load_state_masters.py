@@ -35,6 +35,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+# `python scripts/load_state_masters.py` in the tools container puts scripts/ on the
+# path, not the app root, so `api` would not import (deploy_staging.py load-states)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 FIXTURES = ROOT / "tests" / "fixtures" / "subsidy"
 DEFAULT_EFFECTIVE_FROM = dt.date(2026, 9, 15)       # the CG and RJ formats' arrival
 STATES = {"AP": "Andhra Pradesh micro irrigation (APMIP)", "CG": "Chhattisgarh micro irrigation", "RJ": "Rajasthan micro irrigation",

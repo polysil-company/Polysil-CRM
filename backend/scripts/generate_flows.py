@@ -1218,7 +1218,8 @@ def f_order() -> None:
                "reject -> DRAFT with the reason; order.decided to the owner", GREEN),
         ("o7", "last step approves -> status approved\n"
                "order.confirmed to the buyer, order.decided to the owner,\n"
-               "pdf_state = pending; the worker renders the PDF once", GREEN),
+               "pdf_state = pending; the worker renders the PDF once:\n"
+               "customer copy + staff-only internal copy (FS-091)", GREEN),
         ("o8", "POST /orders/{id}/dispatches -> dispatch_record()\n"
                "order, then its lines; never above the open quantity,\n"
                "in the line's unit precision; status derived from the lines", BLUE),
@@ -1234,6 +1235,19 @@ def f_order() -> None:
     order = [s[0] for s in steps]
     for a, b in zip(order, order[1:], strict=False):
         e += edge(f"e_{a}_{b}", n[a], n[b])
+
+    e += note("nRed5", -420, 600,
+              "TWO PDFs, ONE pdf_state (FS-091)\n\n"
+              "The dealer's copy has no names, no remarks.\n"
+              "The internal copy adds every approval round,\n"
+              "who decided and the remark: ?copy=internal,\n"
+              "staff only, 403 for a dealer.\n\n"
+              "An internal copy that fails never holds back\n"
+              "the dealer's. Claim branch 2 renders it later,\n"
+              "only when nothing is pending, with pdf_state\n"
+              "left at ready: an old order's customer copy\n"
+              "is never rendered again.",
+              w=400, colour=RED)
 
     e += note("nRed1", 920, 60,
               "app_role CANNOT WRITE THE STATUS\n\n"

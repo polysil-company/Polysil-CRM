@@ -183,9 +183,11 @@ async def _approved(db: AsyncSession) -> tuple[Any, str]:
         await m13._decide(db, who[s.role], s.id)
     # the claim takes any due order; another test's committed one would be claimed
     # first when the API tests run alongside. Set them aside, in this transaction only.
+    # 092: a ready order owing its internal copy is claimed too, once nothing is pending
     await db.execute(text(
         "UPDATE sales_order SET pdf_next_attempt_at = now() + interval '1 day' "
-        "WHERE pdf_state = 'pending' AND id <> CAST(:o AS uuid)"), {"o": order})
+        "WHERE (pdf_state = 'pending' OR (pdf_state = 'ready' AND pdf_internal_key IS NULL)) "
+        "AND id <> CAST(:o AS uuid)"), {"o": order})
     return w, order
 
 
@@ -213,9 +215,11 @@ async def test_the_worker_claims_an_approved_order_and_a_stale_lease_writes_noth
     assert await _claim(db) is None, "a live lease is not claimed twice"
 
     await m13._as(db, SYSTEM_USER_ID)
-    stale = (await db.execute(text("SELECT order_render_done(CAST(:o AS uuid), gen_random_uuid(), 'x')"),
+    # 092: done takes the internal copy's key too
+    stale = (await db.execute(text("SELECT order_render_done(CAST(:o AS uuid), gen_random_uuid(), 'x', 'y')"),
                               {"o": order})).scalar_one()
-    done = (await db.execute(text("SELECT order_render_done(CAST(:o AS uuid), CAST(:l AS uuid), 'orders/k.pdf')"),
+    done = (await db.execute(text("SELECT order_render_done(CAST(:o AS uuid), CAST(:l AS uuid), "
+                                  "'orders/k.pdf', 'orders/k-internal.pdf')"),
                              {"o": order, "l": doc["lease_token"]})).scalar_one()
     await m13._as_owner(db)
     assert (stale, done) == (False, True)
@@ -257,6 +261,8 @@ async def test_only_the_system_principal_renders_orders(db: AsyncSession) -> Non
     await m13._as(db, w.officer)
     await m13._refused(db, "SELECT order_render_claim(interval '5 minutes')", {}, "42501")
     await m13._refused(db, "SELECT order_render_done(CAST(:o AS uuid), gen_random_uuid(), 'x')",
+                       {"o": order}, "42501")
+    await m13._refused(db, "SELECT order_render_done(CAST(:o AS uuid), gen_random_uuid(), 'x', 'y')",
                        {"o": order}, "42501")
     await m13._refused(db, "SELECT order_render_failed(CAST(:o AS uuid), gen_random_uuid(), 'x')",
                        {"o": order}, "42501")

@@ -510,6 +510,7 @@ One approval chain.
 | `remarks` | string \| null | yes |  |
 | `pdf_state` | `none` \| `pending` \| `ready` \| `failed` | yes | The approved order's PDF: none before approval, pending while the worker renders it, ready to download, or failed. |
 | `pdf_error` | string \| null |  | Why the PDF failed. Staff only. |
+| `pdf_internal_state` | `none` \| `pending` \| `ready` \| `failed` \| null |  | Staff only, null for a dealer (FS-091): the internal copy with the approval trail. ready shows "Download internal copy" (`GET /orders/{id}/pdf?copy=internal`); pending shows "Preparing internal copy"; failed hides the button. |
 | `confirmation` | `queued` \| `no_mobile` \| `disabled` \| null |  | Whether the buyer was sent the WhatsApp confirmation on approval: queued, no_mobile (tell the officer to call), or disabled. Null before approval. |
 | `benefits` | OrderBenefit[] |  | Scheme benefits on the order (FS-031): applied at submit, reversed if it returns to draft or is cancelled. They reduce `payable`, never the invoice. |
 | `payable` | string \| null |  | What the buyer owes: the total minus the applied benefits. Payments count against this. |
