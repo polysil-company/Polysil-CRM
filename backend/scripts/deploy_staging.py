@@ -468,12 +468,16 @@ def deploy_prod(env: dict[str, str]) -> None:
 
 def seed_prod(env: dict[str, str]) -> None:
     """Roles, the release-scope permissions, the stand-in thresholds, the states and
-    the first administrator; then the product master. No demo data."""
+    the first administrator; then the product master and the subsidy grids. No demo data."""
     guard(env)
     run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/seed_prod.py",
                             profile="tools"))
     run_remote(env, compose(env, "run", "--rm", "tools", "python",
                             "scripts/load_product_master.py", profile="tools"))
+    # the GGRC unit cost and quantity grids and the crop spacings, from data/boq. Without
+    # them the subsidy calculator has nothing to price from (ISS-244). Idempotent.
+    run_remote(env, compose(env, "run", "--rm", "tools", "python",
+                            "scripts/load_subsidy_masters.py", profile="tools"))
     # the company's GST registrations: a quotation or order is priced from one
     run_remote(env, compose(env, "run", "--rm", "tools", "python", "scripts/load_seller_gstins.py",
                             "--csv", "/app/data/masters/seller-gstins.csv", profile="tools"))
