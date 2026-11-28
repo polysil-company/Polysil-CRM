@@ -187,6 +187,14 @@ Measured against `integration` at `33901f8` (#225). Every backend commit since 2
 - [x] **50. Team and role filters on the reports** (FS-082). PR #237, 5 Nov (`feature/RPT-006-team-filters`), stacked on #232. RPT-006. `team_of` (a person and everyone below them on the org chart) and `roles` on every report that takes a person, plus the forecast, insights and territory performance; salesperson performance gives every team member a row with role and office, zeros included. `404 not_in_your_line` outside the caller's line; never with `owner_id`. `backend/docs/api/reports.md`.
 - [x] **51. The setup check, and an office that covers no area** (FS-082). PR #238, 6 Nov (`feature/ADMN-009-setup-check`), stacked on #237. ADMN-009. `GET /users/setup-check` on the admin dashboard: field staff in an office with no area, area roles with no territories, staff with no manager one level up, staff on the System office, partners with no area, each with its count and the first 100 to fix. And the user form's new refusal `422 office_has_no_area` (a Field Officer or District Manager in an office that covers no area), on the office or the role. `backend/docs/api/users.md`.
 
+### From the client on 28 Nov (subsidy)
+
+- [-] **52. Subsidy lines from the price list** (SUBS-002, SUBS-004, QUOT-014). **Waiting on BE-045** and its three decisions (group or block area, the sump rule, whether a rate can be changed by hand), and on a subsidised price list with GGRC rates. Then:
+  - a product search in each field-unit and head-unit row, filling the unit and rate from the subsidised price list;
+  - installation, sump, secondary transportation and PVC/HDPE fittings as automatic per-hectare rows, with their quantity from the area;
+  - on the calculator, *Start a subsidy application* and a quotation's subsidy.
+- [x] **53. No subsidy figures left from other inputs** (SUBS-019). PR into `integration`, 28 Nov (`fix/SUBS-019-no-stale-subsidy-figures`). The client read old figures (₹700 subsidy on ₹1,000) beside a half-filled item as a wrong calculation.
+
 ## Waiting on someone else
 
 - [x] **BE-023:** a `lead_id` filter on `GET /subsidy-applications`, for the subsidy card on a lead. Done on the backend; picked up in PR #193, 22 Oct.
@@ -195,6 +203,7 @@ Measured against `integration` at `33901f8` (#225). Every backend commit since 2
 - [-] **BE-039:** a quotation for a dealer or distributor with no farmer's lead. Open on the backend (can start now). The frontend then adds "New quotation for a dealer", reusing SO-012's dealer picker.
 - [-] **BE-040:** the employees who look after a dealer. Open on the backend; what it grants waits on the client. The frontend then adds the field to the partner form and "My dealers".
 - [-] **BE-041:** a leaver's leads go to their dealer. Waits on the client.
+- [-] **BE-045:** subsidy lines from the subsidised price list, with installation, sump, secondary transportation and PVC/HDPE fittings priced per hectare by area. Open on the backend, with three decisions for the client. The frontend then does item 52.
 - [x] **CHNL-002, the client:** yes (20 Oct), dealers add their own sub-dealers. Built: Channel partners opens to a distributor or dealer, which adds the next type down under itself. PR #186, 21 Oct (`feature/CHNL-002-portal-sub-dealers`).
 - [x] **F-12, the user:** yes (20 Oct), files stay locked after the QC verdict, with a **Download PDF** on the complaint like a quotation or an order. Built against the shape asked in BE-031 (CMPL-013), shown once the backend sends `pdf_state`. PR #187, 21 Oct (`feature/CMPL-013-complaint-pdf`).
 

@@ -1551,6 +1551,16 @@ export const DATA_IDS = {
     notes:
       "payments.approve approves and returns, never on one you recorded (403 own_decision); payments.edit pays. Dealers don't see commissions yet (GAP-330).",
   },
+  "SUBS-019": {
+    domain: "SUBS",
+    title:
+      "The subsidy shows no figures left from other inputs: a mistake or a missing field clears them",
+    owner: "frontend",
+    status: "in-progress",
+    endpoints: ["POST /subsidy/calculate"],
+    notes:
+      "Client report, 28 Nov. On the calculator, Start a subsidy application and a quotation's subsidy. Rates from the price list are BE-045.",
+  },
   "SUBS-018": {
     domain: "SUBS",
     title: "Commission rates — per scheme, by system, partner type or partner, from a date",

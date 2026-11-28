@@ -26,7 +26,10 @@ const NOTHING: CalculateRequest = { system_type: "drip", crops: [] };
 
 export interface SubsidyCalculationState {
   readonly plan: CalculationPlan;
-  /** The figures on screen; they stay while the next arrive. */
+  /**
+   * The figures on screen. They stay, dimmed, while the next arrive, and go once the inputs
+   * can't be calculated (SUBS-019).
+   */
   readonly result: SubsidyCalculation | null;
   /** A newer set of inputs is waiting for its figures. */
   readonly calculating: boolean;
@@ -63,8 +66,13 @@ export function useSubsidyCalculation(
     !query.isPlaceholderData &&
     !query.isFetching;
   const serverProblems = query.isError && settled ? (readFieldErrors(query.error) ?? {}) : {};
-  // The last figures stay, dimmed, while the inputs change; another system's never show here.
-  const result = query.data?.systemType === draft.systemType ? query.data : null;
+  // SUBS-019 · Once typing pauses on inputs that can't be calculated (a mistake or a missing
+  // field), the last figures go: they were for other inputs, and a farmer's subsidy read off
+  // them is wrong (client report, 28 Nov). The backend refusing the inputs does the same.
+  const cannotCalculate = settled && (debounced.request === null || query.isError);
+  // Otherwise the last figures stay, dimmed, while the next arrive; another system's never show.
+  const result =
+    !cannotCalculate && query.data?.systemType === draft.systemType ? query.data : null;
 
   return {
     plan,

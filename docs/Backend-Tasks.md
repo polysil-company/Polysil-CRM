@@ -142,6 +142,10 @@ in the same shape. Never renumber or reuse a number.
 
 - [x] **BE-044** · Raise the ₹10 crore ceiling on one line and on a document · QUOT-004, QUOT-017, SO-005 · high
 
+**From the client's report of 28 Nov**: a GGRC drip quotation's items, installation and sump are typed, not taken from the price list
+
+- [ ] **BE-045** · Subsidy quotation lines from the subsidised price list, with per-hectare items priced by area · SUBS-002, SUBS-004, QUOT-014 · high · **with decisions**
+
 ---
 
 ## Details
@@ -931,3 +935,38 @@ in the same shape. Never renumber or reuse a number.
   - No pricing migration: the columns already held it. Migration 091 caps order reward points, which could overflow on a very large order and stop the dispatch.
   - Both figures are our assumption (client question 44.1).
 - **Frontend meanwhile (QUOT-017):** a refused line clears its old figures and says its value and the ceiling in rupees. A refused document says so above the totals.
+
+### BE-045 · Subsidy quotation lines from the subsidised price list, with per-hectare items priced by area
+
+- **Status:** ⬜ Open · **with decisions** (below)
+- **Asked:** 28 Nov 2026 · SUBS-002, SUBS-004, QUOT-014 · the client's screenshot of *Start a subsidy application* (GGRC, Drip, POL/GJ/2026-27/00015)
+- **What the client said:**
+  - "Product and price not linked."
+  - "Installation rate from the price list, with auto multiplication by the crop group's area."
+  - "Sump auto-selected from the price list."
+  - "GGRC > Drip / Mini Sprinkler quotation > in the field unit, secondary transportation and PVC/HDPE fitting rates come from the price list, but the quantity is automatic from the crop group's area."
+  - "No product and rate, so checking is pending."
+- **What happens today:**
+  - `POST /subsidy/calculate`, the application's create and `PUT /quotations/{id}/subsidy` take each field-unit and head-unit `Line` as typed: `description`, `uom`, `rate`, `qty`.
+  - `product_id` is optional and only checks the block and subsidy eligibility. The rate always comes from the request.
+  - `installation_rate_per_ha` and `sump.rate_per_ha` are typed rupees.
+  - `backend/api/schemas/subsidy.py` says why: "GAP-080: keyed on the description and carrying its own rate, because there is no product master with item codes yet. When module F lands, this becomes a `product_id` and the rate comes from the price list in force." Module F has landed.
+- **What is asked:**
+  1. **Lines from the price list:** a `Line` with `product_id` takes its description, unit and rate from the **subsidised** price list in force (FS-061 `sales_type: subsidised`), the way a quotation's lines do, with the preview's ids and `rate_changed`. The typed rate stays only for a line with no product, if the client still wants that (decision 3).
+  2. **Per-hectare items:** installation, sump, secondary transportation and PVC/HDPE fittings become price-list products priced per hectare. The backend fills their quantity from the area (decision 1). Installation replaces `installation_rate_per_ha`, and the sump `sump.rate_per_ha`. The calculation, the application and the quotation's subsidy all use the same figures.
+  3. **Sump selection:** pick the sump automatically by the rule the client gives (decision 2).
+  4. **The data:** the product master has no real prices (`load_product_master.py` loads stand-ins, GAP-089). A subsidised price list needs the GGRC rates, including the four per-hectare items. Say who loads it and from which file.
+- **Decisions needed (from the client, through the user):**
+  1. **Area:** is "crop group area" the **group's total area** (`group_total_area`, e.g. 4.00 Ha) or **each crop block's area** (e.g. 1.61 Ha)?
+  2. **Sump:** what is the selection rule? By area range, by system, or one sump item?
+  3. **Rates:** may a designer still change a price-list rate by hand on a subsidy quotation, or is it locked?
+- **Why:** the designer can't cost a GGRC quotation without the rates, so the subsidy shows only what was typed (on 28 Nov, ₹1,000 of farmer education).
+- **Done when:**
+  - a field-unit or head-unit line priced from the subsidised list, and the four per-hectare items with their area quantity, calculate, save and print;
+  - the request and response shapes are in `subsidy.md`, `subsidy-applications.md` and `quotations.md`.
+- **Done in:** —
+- **Backend notes:** —
+- **Frontend then (plan item 52, waiting on this):**
+  - a product search in each field-unit and head-unit row, filling the unit and rate;
+  - automatic rows for the per-hectare items, showing their quantity from the area;
+  - no rate typed for a priced item.
