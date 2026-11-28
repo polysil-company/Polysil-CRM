@@ -145,9 +145,8 @@ export function LinesEditor({
                     )}
                   >
                     <label htmlFor={id} className="text-xs text-muted-foreground md:sr-only">
-                      {LINE_FIELD_LABELS[field]}
+                      {LINE_FIELD_LABELS[field]}{" "}
                       <span className="sr-only">
-                        {" "}
                         of {rowName.toLowerCase()} {number}
                       </span>
                     </label>

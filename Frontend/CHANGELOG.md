@@ -7,10 +7,11 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 ## Index
 
-138 changes, newest first. Each title opens its entry.
+139 changes, newest first. Each title opens its entry.
 
 | Date | Change | Type | Data IDs |
 | --- | --- | --- | --- |
+| 2026-11-28 | [The subsidy shows no figures left from other inputs](changelog/entries/2026-11-28--fix--SUBS-019--the-subsidy-shows-no-figures-left-from-other-inputs.md) | `fix` | `SUBS-019` `SUBS-002` `SUBS-004` `QUOT-014` |
 | 2026-11-17 | [An item over the ₹10 crore ceiling says so in rupees, with no old figures beside it](changelog/entries/2026-11-17--fix--QUOT-017--an-item-over-the-10-crore-ceiling-says-so-in-rupees-with-no.md) | `fix` | `QUOT-017` `QUOT-004` `SO-005` |
 | 2026-11-13 | [Installation and fittings charges, the industrial approval ladder, and Polysil Sarthi](changelog/entries/2026-11-13--feature--QUOT-016--installation-and-fittings-charges-the-industrial-approval.md) | `feature` | `QUOT-016` `APPR-003` `APP-013` `QUOT-015` |
 | 2026-11-11 | [Day pickers: arrows as tall as the date field on phones](changelog/entries/2026-11-11--fix--TRK-002--day-pickers-arrows-as-tall-as-the-date-field-on-phones.md) | `fix` | `TRK-002` `TRK-005` `TASK-001` |
@@ -149,6 +150,51 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 | 2026-09-15 | [Sign-in for staff and channel partners, sessions that stay signed in, and permission-based navigation](changelog/entries/2026-09-15--feature--AUTH-001--sign-in-sessions-and-permissions.md) **(breaking)** | `feature` | `AUTH-001` `AUTH-002` `AUTH-003` `AUTH-004` `AUTH-005` `AUTH-006` `OBS-002` `APP-001` `APP-002` `APP-004` `DS-001` |
 | 2026-09-15 | [Notification bell in the top bar, and direct messages between staff](changelog/entries/2026-09-15--feature--NOTIF-001--notification-bell-and-staff-messages.md) | `feature` | `NOTIF-001` `NOTIF-002` `MSG-001` `MSG-002` `MSG-003` `MSG-004` `MSG-005` `APP-001` |
 | 2026-09-14 | [Frontend foundation — design system, app shell, dashboard, leads and quality gates](changelog/entries/2026-09-14--feature--APP-001--frontend-foundation.md) | `feature` | `APP-001` `APP-002` `APP-003` `APP-004` `OBS-001` `OBS-002` `DS-001` `AUTH-002` `LEAD-001` `LEAD-002` `LEAD-003` `LEAD-004` `RPT-001` `REPO-001` `REPO-002` |
+
+## 28 November 2026
+
+### The subsidy shows no figures left from other inputs
+
+`fix` · `SUBS-019` `SUBS-002` `SUBS-004` `QUOT-014` · Nakul Srivastava · [entry](changelog/entries/2026-11-28--fix--SUBS-019--the-subsidy-shows-no-figures-left-from-other-inputs.md)
+
+#### Before
+
+The client reported that the subsidy "calculation is not working correctly" on a lead and on a quotation (28 Nov). Their screenshot of _Start a subsidy application_ (GGRC, Drip, 1.61 Ha mango) showed:
+
+- a field-unit item "pipe" and a head-unit item "inlet" typed, with no unit, rate or quantity, each marked "Give its unit";
+- "Correct the marked fields to see the subsidy." at the top;
+- and still a full set of figures: ₹700 subsidy and ₹300 for the farmer per category, and a quotation summary of ₹0 for every block but ₹1,000 of farmer education.
+
+Those figures came from the last inputs that could be calculated, before the items were added. The panel only dimmed them to 60%, so they read as the subsidy for what was on screen.
+
+The backend's arithmetic was right: 70% of ₹1,000 is ₹700. The calculator, _Start a subsidy application_ and a quotation's subsidy share this panel, so all three did it.
+
+#### Now
+
+- Once typing pauses on inputs that can't be calculated, the subsidy and the quotation summary go. That covers a mistake, a missing field, or a refusal from the backend. The panel lists the farmer categories without figures, and the status says what to do, such as "Correct the marked fields to see the subsidy."
+- Finishing the inputs brings the figures back. While a valid change recalculates, the last figures still dim for that moment, as before.
+- A field-unit or head-unit row's boxes are named "Item of field unit item 1" for screen readers. They were "Itemof…".
+
+#### Discussion
+
+- **The rest of the client's report is BE-045.** The designer types each item's rate, and installation and the sump per hectare, because a subsidy line still carries its own rate (the backend's GAP-080). The client wants the rates from the subsidised price list, with installation, sump, secondary transportation and PVC/HDPE fittings priced per hectare from the area. BE-045 asks for it, with three decisions for the client; plan item 52 is the frontend's half, waiting on it.
+- Waiting for the pause keeps the figures from flickering while a number is half typed ("1." on the way to "1.5").
+
+#### Files changed
+
+- `src/features/subsidy/hooks/use-subsidy-calculation.ts`: no result once the paused inputs can't be calculated.
+- `src/features/subsidy/components/calculator-inputs.tsx`: the space in each row box's name.
+- `src/features/subsidy/components/subsidy-calculator.test.tsx`: SUBS-019.
+- `src/lib/data-ids/registry.ts`, `Docs/Data-IDs.md`, `Docs/Tested-Features.md`, `Docs/plan-13oct-2026.md` (items 52 and 53).
+- `../docs/Backend-Tasks.md`: BE-045.
+
+#### Tests
+
+- `subsidy-calculator.test.tsx`, `[SUBS-019] No figures left from other inputs`:
+  - figures for 1.61 Ha;
+  - a field-unit item named "pipe" alone clears the subsidy and the summary, and says to correct the marked fields;
+  - adding its unit, rate and quantity brings the figures back.
+- The other subsidy suites (calculator, applications, quotation subsidy) pass unchanged.
 
 ## 17 November 2026
 

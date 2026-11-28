@@ -192,3 +192,40 @@ describe("[SUBS-014] SubsidyCalculator · scheme", () => {
     });
   });
 });
+
+describe("[SUBS-019] No figures left from other inputs", () => {
+  afterEach(() => {
+    writeMockRole("admin");
+  });
+
+  it("drops the figures once a half-filled item stops the calculation", async () => {
+    signInAs("employee");
+    const user = show();
+    await fillCrop(user, { area: "1.61", spacing: "1.37" });
+    expect(
+      await screen.findByRole("table", { name: /Farmer categories for/ }, SETTLE),
+    ).toBeInTheDocument();
+
+    // The client's case (28 Nov): an item named, with no unit, rate or quantity yet.
+    await user.type(screen.getByRole("textbox", { name: /^Item of field unit item 1/ }), "pipe");
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Correct the marked fields to see the subsidy.",
+      );
+    }, SETTLE);
+    // The subsidy and the summary of the inputs before are gone, not dimmed beside the mistake.
+    expect(screen.queryByRole("table", { name: /Farmer categories for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Quotation summary" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Farmer categories" })).toBeInTheDocument();
+
+    // Finishing the item brings the figures back, with it.
+    const row = screen.getByRole("listitem", { name: "Field unit item 1" });
+    await user.type(within(row).getByRole("textbox", { name: /^Unit/ }), "Mtr.");
+    await user.type(within(row).getByRole("textbox", { name: /^Rate/ }), "120");
+    await user.type(within(row).getByRole("textbox", { name: /^Quantity/ }), "500");
+    expect(
+      await screen.findByRole("table", { name: /Farmer categories for/ }, SETTLE),
+    ).toBeInTheDocument();
+  });
+});

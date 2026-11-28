@@ -314,6 +314,7 @@ The registry file is the source of truth; this snapshot helps reading.
 | SUBS-016 | Dealer commission and TOD on an application, stage 18 (`GET`/`POST /subsidy-applications/{id}/commission`, `/commission/preview`) | shared | in-progress |
 | SUBS-017 | Dealer commissions for Accounts: approve, return, cancel, pay, Excel (`/dealer-commissions*`) | shared | in-progress |
 | SUBS-018 | Commission rates by scheme, from a date (`GET`/`POST /commission-rates`) | shared | in-progress |
+| SUBS-019 | The subsidy shows no figures left from other inputs: a mistake or a missing field clears them | frontend | in-progress |
 | DISP-001 | Dispatch work queue — orders to ship, and the dispatch log (`GET /orders?status=approved,partially_dispatched`, `GET /dispatches`) | shared | in-progress |
 | DISP-002 | Record a dispatch on an order, void it, close the rest short (`POST /orders/{orderId}/dispatches`, `POST /dispatches/{dispatchId}/void`, `POST /orders/{orderId}/close-short`) | shared | in-progress |
 | DISP-003 | Stock on orders: Order to, availability per line, the order's warehouse and the dispatch's (`GET /stock/availability`, `warehouse_id`) | shared | in-progress |
