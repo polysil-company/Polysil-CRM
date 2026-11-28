@@ -159,7 +159,7 @@ How to write an entry: [changelog/README.md](changelog/README.md).
 
 #### Before
 
-The client reported that the subsidy "calculation is not working correctly" on a lead and on a quotation (28 Nov). Their screenshot of *Start a subsidy application* (GGRC, Drip, 1.61 Ha mango) showed:
+The client reported that the subsidy "calculation is not working correctly" on a lead and on a quotation (28 Nov). Their screenshot of _Start a subsidy application_ (GGRC, Drip, 1.61 Ha mango) showed:
 
 - a field-unit item "pipe" and a head-unit item "inlet" typed, with no unit, rate or quantity, each marked "Give its unit";
 - "Correct the marked fields to see the subsidy." at the top;
@@ -167,7 +167,7 @@ The client reported that the subsidy "calculation is not working correctly" on a
 
 Those figures came from the last inputs that could be calculated, before the items were added. The panel only dimmed them to 60%, so they read as the subsidy for what was on screen.
 
-The backend's arithmetic was right: 70% of ₹1,000 is ₹700. The calculator, *Start a subsidy application* and a quotation's subsidy share this panel, so all three did it.
+The backend's arithmetic was right: 70% of ₹1,000 is ₹700. The calculator, _Start a subsidy application_ and a quotation's subsidy share this panel, so all three did it.
 
 #### Now
 
